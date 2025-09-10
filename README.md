@@ -1,6 +1,7 @@
 # Graph theory research project 2025
 
 ## Building
+This project uses the [Tup](https://gittup.org/tup/) build system
 linux: install `tup` with `yay -S tup` (from the AUR)  
 macos: install `tup` with `brew install tup`
 
