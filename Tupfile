@@ -1,0 +1,7 @@
+CC = g++
+
+CFLAGS += -O3
+CFLAGS += -g3
+
+: foreach *.cpp |> $(CC) -c $(CFLAGS) %f -o %o |> build/%B.o
+: build/*.o |> $(CC) $(CFLAGS) %f -o %o |> build/main.out
