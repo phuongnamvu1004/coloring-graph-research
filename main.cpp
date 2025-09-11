@@ -1,6 +1,12 @@
+#include <algorithm>
+#include <boost/graph/compressed_sparse_row_graph.hpp>
+#include <iostream>
 
+#include "eigen/Eigen/Core"
 #include "originalToColoring.h"
 #include "graphSketcher.h"
+
+#include "eigen/Eigen/Dense"
 
 int main() {
 	Edge special_graph_edges[] = {
@@ -20,6 +26,24 @@ int main() {
 	std::vector<int> reconstructible_vertices;
 	std::vector<int> n_complete_non_reconstructible_non_special_vertices;
 	Graph coloring_graph = coloringFromOriginal(original_graph, k, adj_list, special_vertex_classes, class_to_num_vertices, special_vertices, reconstructible_vertices);
+
+	graph_traits<Graph>::edge_iterator ei, ei_end;
+
+	int num_coloring_vertices = 12; // tmp, how does this graph work
+
+	Eigen::MatrixXd adjacency_matrix = Eigen::MatrixXd::Zero(num_coloring_vertices, num_coloring_vertices);
+
+	for (tie(ei, ei_end) = edges(coloring_graph); ei != ei_end; ++ei) { // loop through each edge
+		auto u = source(*ei, coloring_graph); // vertex label of "source"
+		auto v = target(*ei, coloring_graph); // vertex label of "destination"
+
+		adjacency_matrix(u, v) = 1;
+		adjacency_matrix(v, u) = 1;
+	}
+
+	// std::cout << adjacency_matrix << std::endl;
+
+	std::cout << adjacency_matrix.eigenvalues() << std::endl; // really small numbers might be actually 0
 
 	boost::dynamic_properties dp;
 	dp.property("color", get(vertex_color, coloring_graph));
