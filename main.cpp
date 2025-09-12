@@ -29,7 +29,8 @@ int main() {
 
 	graph_traits<Graph>::edge_iterator ei, ei_end;
 
-	int num_coloring_vertices = 12; // tmp, how does this graph work
+
+	int num_coloring_vertices = coloring_graph.m_vertices.size();
 
 	Eigen::MatrixXd adjacency_matrix = Eigen::MatrixXd::Zero(num_coloring_vertices, num_coloring_vertices);
 
