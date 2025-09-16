@@ -22,6 +22,16 @@ void print_coloring_to_vertex_map(const std::map<std::vector<int>, int>& colorin
 	}
 }
 
+/**
+ * @brief Validates if a coloring is proper after changing one vertex's color
+ * @param original The original graph structure
+ * @param next_coloring The proposed new coloring
+ * @param changed_vertex The vertex whose color was changed
+ * @return true if coloring is valid (no adjacent vertices share same color)
+ * 
+ * Checks only the neighbors of the changed vertex for efficiency, assuming
+ * the rest of the coloring was already valid.
+ */
 bool is_valid_coloring(const Graph& original, const std::vector<int>& next_coloring, int changed_vertex) {
 	// check all adjacent vertices of changed_vertex
 	const auto& neighbors_of_changed_vertex = make_iterator_range(out_edges(changed_vertex, original));
@@ -43,13 +53,25 @@ int find_num_colors(const std::vector<int>& coloring) {
 	return used_colors.size();
 }
 
-
 bool is_special_class(const std::vector<int>& coloring, int k) {
 	// type 1 special: return if the number of colors is strictly less than k, assuming k > chromatic number
 	return find_num_colors(coloring) < k;
 }
 
 
+/**
+ * @brief Converts a coloring to its canonical lowest permutation form
+ * @param coloring Input coloring vector (passed by value for local modification)
+ * @return Canonical form where colors are relabeled 0,1,2,... in order of first appearance
+ * 
+ * This creates equivalence classes of colorings. For example:
+ * - [5, 2, 5, 7, 2] becomes [0, 1, 0, 2, 1]
+ * - [3, 1, 3, 9, 1] becomes [0, 1, 0, 2, 1] (same as above)
+ * 
+ * Algorithm:
+ * 1. First pass: Build mapping from original colors to canonical labels (0,1,2,...)
+ * 2. Second pass: Apply mapping to create result vector
+ */
 std::vector<int> lowest_permutation(std::vector<int> coloring) {
 	std::map<int, int> colorsToLowestColor;
 	int next_color = 0;
@@ -68,6 +90,20 @@ std::vector<int> lowest_permutation(std::vector<int> coloring) {
 	return result;
 }
 
+/**
+ * @brief Determines if original graph structure can be reconstructed from a coloring
+ * @param coloring The k-coloring to test (uses exactly k colors)
+ * @param original The original graph structure
+ * @param k Total number of available colors
+ * @return true if original graph edges can be inferred from the coloring
+ * 
+ * Type 2 special (reconstructible) vertices are colorings where:
+ * 1. Exactly k colors are used
+ * 2. For every edge (u,v) in original graph, vertices u and v share at least one "free color"
+ * 
+ * Free colors for a vertex are colors not used by the vertex itself or any of its neighbors.
+ * If adjacent vertices share free colors, we can deduce they were originally connected.
+ */
 bool can_reconstruct_original(std::vector<int>& coloring, const Graph& original, int k) {
 	graph_traits<Graph>::edge_iterator ei, ei_end;
 	std::set<int> all_colors;
@@ -102,12 +138,33 @@ bool can_reconstruct_original(std::vector<int>& coloring, const Graph& original,
 	return true;
 }
 
+/**
+ * @brief Populates the mapping from coloring class numbers to vertex counts
+ * @param class_to_num_vertices Output map from class number to count of vertices in that class
+ * @param total_vertices Total number of vertices in the coloring graph
+ * @param coloring_from_vertex_number Map from vertex numbers to their colorings
+ * @param coloring_class_number_from_lowest_permutation Map from lowest permutations to class numbers
+ * 
+ * Counts how many vertices belong to each equivalence class (same lowest permutation).
+ */
 void populate_class_to_num_vertices(std::map<int, int>& class_to_num_vertices, int total_vertices, std::map<int, std::vector<int> >& coloring_from_vertex_number, std::map<std::vector<int>, int>& coloring_class_number_from_lowest_permutation) {
 	for (const auto& coloring : coloring_from_vertex_number) {
 		class_to_num_vertices[coloring_class_number_from_lowest_permutation[lowest_permutation(coloring.second)]]++;
 	}
 }
 
+/**
+ * @brief Builds the compressed adjacency list representation
+ * @param adj_list Output map: class_number -> {neighbor_class_number -> edge_count}
+ * @param seen_colorings Set of all discovered lowest permutation colorings
+ * @param vertex_number_from_coloring Map from colorings to vertex numbers
+ * @param coloring_from_vertex_number Map from vertex numbers to colorings
+ * @param coloring_graph The constructed coloring graph
+ * @param coloring_class_number_from_lowest_permutation Map from lowest permutations to class numbers
+ * 
+ * Creates a compressed representation where instead of storing individual vertex edges,
+ * we count edges between equivalence classes of colorings.
+ */
 void populate_adj_list(std::map<int, std::map<int, int> >& adj_list, std::set<std::vector<int> >& seen_colorings, std::map<std::vector<int>, int >& vertex_number_from_coloring, std::map<int, std::vector<int> >& coloring_from_vertex_number, Graph& coloring_graph, std::map<std::vector<int>, int>& coloring_class_number_from_lowest_permutation) {
 	// for every seen coloring, make entry in adj list
 	for (const auto& seen_coloring : seen_colorings) {
@@ -124,6 +181,25 @@ void populate_adj_list(std::map<int, std::map<int, int> >& adj_list, std::set<st
 	}
 }
 
+/**
+ * @brief Main function to construct coloring graph from original graph
+ * @param original The input graph to transform
+ * @param k Number of colors available for coloring
+ * @param adj_list Output: compressed adjacency list (class -> {class -> edge_count})
+ * @param special_vertex_classes Output: set of class numbers for Type 1 special vertices
+ * @param class_to_num_vertices Output: map from class number to vertex count in that class
+ * @param special_vertices Output: vector of Type 1 special vertex IDs
+ * @param reconstructible_vertices Output: vector of Type 2 special (reconstructible) vertex IDs
+ * @return The constructed coloring graph
+ * 
+ * Algorithm Overview:
+ * 1. Start with sequential vertex coloring of original graph
+ * 2. Use BFS to explore all reachable valid colorings
+ * 3. For each valid transition, add all k! color permutations for symmetry
+ * 4. Classify vertices as special (Type 1) or reconstructible (Type 2)
+ * 5. Build compressed adjacency representation
+ * 
+ */
 Graph coloringFromOriginal(const Graph& original, int k, std::map<int, std::map<int, int> >& adj_list, std::set<int>& special_vertex_classes, std::map<int, int>& class_to_num_vertices, std::vector<int>& special_vertices, std::vector<int>& reconstructible_vertices) { 
 	std::map<int, std::vector<int> > coloring_from_vertex_number;
 	std::map<std::vector<int>, int> vertex_number_from_coloring;
