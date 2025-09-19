@@ -1,6 +1,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/compressed_sparse_row_graph.hpp>
 #include <iostream>
+#include <iterator>
 
 #include "eigen/Eigen/Core"
 #include "originalToColoring.h"
@@ -38,17 +39,30 @@ int main() {
 	int num_coloring_vertices = coloring_graph.m_vertices.size();
 
 	Eigen::MatrixXd adjacency_matrix = Eigen::MatrixXd::Zero(num_coloring_vertices, num_coloring_vertices);
+	Eigen::MatrixXd laplacian_matrix = Eigen::MatrixXd::Zero(num_coloring_vertices, num_coloring_vertices);
 
 	graph_traits<Graph>::edge_iterator ei, ei_end;
 	for (tie(ei, ei_end) = edges(coloring_graph); ei != ei_end; ++ei) { // loop through each edge
 		auto u = source(*ei, coloring_graph); // vertex label of "source"
 		auto v = target(*ei, coloring_graph); // vertex label of "destination"
+		
+		auto u_edges = boost::out_edges(u, coloring_graph);
+		auto v_edges = boost::out_edges(v, coloring_graph);
 
+		auto u_degree = std::distance(u_edges.first, u_edges.second);
+		auto v_degree = std::distance(v_edges.first, v_edges.second);
+		
 		adjacency_matrix(u, v) = 1;
 		adjacency_matrix(v, u) = 1;
+
+		laplacian_matrix(u, v) = -1;
+		laplacian_matrix(v, u) = -1;
+
+		laplacian_matrix(u, u) = u_degree;
+		laplacian_matrix(v, v) = v_degree;
 	}
 
-	// std::cout << adjacency_matrix << std::endl;
+	std::cout << laplacian_matrix << std::endl;
 
 	std::cout << adjacency_matrix.eigenvalues() << std::endl; // really small numbers might be actually 0
 
