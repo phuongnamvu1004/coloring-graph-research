@@ -1,7 +1,0 @@
-set terminal png
-set nokey
-set output "plot.png"
-plot "3sorted.txt" using 1 title "3", \
-	 "4sorted.txt" using 1 title "4", \
-	 "5sorted.txt" using 1 title "5", \
-	 "6sorted.txt" using 1 title "6"

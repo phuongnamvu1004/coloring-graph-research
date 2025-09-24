@@ -1,0 +1,7 @@
+set terminal png
+set nokey
+set output "plot.png"
+plot "3.txt" using 1 title "3", \
+	 "4.txt" using 1 title "4", \
+	 "5.txt" using 1 title "5", \
+	 "6.txt" using 1 title "6"
