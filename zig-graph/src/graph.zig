@@ -112,13 +112,13 @@ pub fn is_coloring_valid(self: Self, coloring: []const Color) bool {
 
 pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
     var file = try std.fs.cwd().createFile(filename, .{});
-    _ = try file.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\"\nxmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\nxsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">\n<key id=\"d\" for=\"node\" attr.name=\"coloring\" attr.type=\"string\">\n<default>none</default>\n</key>\n<graph id=\"G\" edgedefault=\"undirected\">\n");
+    _ = try file.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\"\nxmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\nxsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">\n<key id=\"d0\" for=\"node\" attr.name=\"coloring\" attr.type=\"string\">\n<default>none</default>\n</key>\n<key id=\"d1\" for=\"node\" attr.name=\"permutation\" attr.type=\"int\">\n<default>-1</default>\n</key>\n<graph id=\"G\" edgedefault=\"undirected\">\n");
     var it = self.vertices.keyIterator();
     var buf: [100:0]u8 = undefined;
     var itoabuf: [100:0]u8 = undefined;
     while (it.next()) |v| {
         const coloring_str = itoa(v.*.label, &itoabuf, k, self.num_original_vertices);
-        const v_string = try std.fmt.bufPrint(&buf, "<node id=\"{d}\"><data key=\"d\">{s}</data></node>\n", .{ v.*.id, coloring_str });
+        const v_string = try std.fmt.bufPrint(&buf, "<node id=\"{d}\"><data key=\"d0\">{s}</data><data key=\"d1\">{d}</data></node>\n", .{ v.id, coloring_str, v.permutation });
         _ = try file.write(v_string);
     }
 
