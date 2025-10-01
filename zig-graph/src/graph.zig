@@ -54,7 +54,7 @@ pub fn adjacent(self: Self, a: *Vertex, b: *Vertex) bool {
     return false;
 }
 
-pub fn neighbors(self: Self, vertex: Vertex) NeighborsIterator {
+pub fn neighbors(self: Self, vertex: *Vertex) NeighborsIterator {
     return NeighborsIterator{
         .g = self,
         .vertex = vertex,
@@ -64,7 +64,7 @@ pub fn neighbors(self: Self, vertex: Vertex) NeighborsIterator {
 
 pub const NeighborsIterator = struct {
     g: Self, // graph
-    vertex: Vertex,
+    vertex: *Vertex,
     current_index: usize,
 
     pub fn next(self: *NeighborsIterator) ?Vertex {
@@ -88,9 +88,9 @@ pub fn remove_edge(self: *Self, edge: Edge) void {
     }
 }
 
-pub fn remove_vertex(self: *Self, vertex: Vertex) void {
+pub fn remove_vertex(self: *Self, vertex: *Vertex) void {
     if (self.num_neighbors(vertex) == 0)
-        _ = self.vertices.remove(vertex);
+        _ = self.vertices.remove(vertex.*);
 }
 
 pub fn num_neighbors(self: Self, vertex: Vertex) i32 {
@@ -112,7 +112,19 @@ pub fn is_coloring_valid(self: Self, coloring: []const Color) bool {
 
 pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
     var file = try std.fs.cwd().createFile(filename, .{});
-    _ = try file.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\"\nxmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\nxsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">\n<key id=\"d0\" for=\"node\" attr.name=\"coloring\" attr.type=\"string\">\n<default>none</default>\n</key>\n<key id=\"d1\" for=\"node\" attr.name=\"permutation\" attr.type=\"int\">\n<default>-1</default>\n</key>\n<graph id=\"G\" edgedefault=\"undirected\">\n");
+    _ = try file.write(
+        \\<?xml version="1.0" encoding="UTF-8"?>
+        \\<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+        \\xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        \\xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+        \\<key id="d0" for="node" attr.name="coloring" attr.type="string">
+        \\<default>none</default>
+        \\</key>
+        \\<key id="d1" for="node" attr.name="permutation" attr.type="int">
+        \\<default>-1</default>
+        \\</key>
+        \\<graph id="G" edgedefault="undirected">\n
+    );
     var it = self.vertices.keyIterator();
     var buf: [100:0]u8 = undefined;
     var itoabuf: [100:0]u8 = undefined;

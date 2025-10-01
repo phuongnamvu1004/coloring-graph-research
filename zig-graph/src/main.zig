@@ -26,10 +26,6 @@ pub fn main() !void {
     // _ = try graph.add_edge(v5, v6);
     // _ = try graph.add_edge(v6, v1);
 
-    // graph.remove_edge(.{ .a = v1, .b = v4 });
-    // if (graph.is_coloring_valid(&.{ 1, 2, 2, 2 }))
-    //     std.debug.print("valid\n", .{});
-
     const k = 4;
 
     std.debug.print("generating coloring graph...\n", .{});
@@ -43,12 +39,6 @@ pub fn main() !void {
     try coloring_graph.print_as_graphml("coloring.graphml", k);
 
     try bell_graph.print_as_graphml("bell.graphml", k);
-
-    // var neighbors = graph.neighbors(v1);
-    // while (neighbors.next()) |v| {
-    //     std.debug.print("{d}\n", .{v});
-    // }
-    // graph.debug_print();
 
     try graph.print_as_graphml("file.graphml", k);
 }
