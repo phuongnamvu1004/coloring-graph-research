@@ -67,7 +67,7 @@ pub const NeighborsIterator = struct {
     vertex: *Vertex,
     current_index: usize,
 
-    pub fn next(self: *NeighborsIterator) ?Vertex {
+    pub fn next(self: *NeighborsIterator) ?*Vertex {
         for (self.g.adjacency_list.items[self.current_index..]) |e| {
             self.current_index += 1;
             if (e.a == self.vertex)
@@ -93,8 +93,8 @@ pub fn remove_vertex(self: *Self, vertex: *Vertex) void {
         _ = self.vertices.remove(vertex.*);
 }
 
-pub fn num_neighbors(self: Self, vertex: Vertex) i32 {
-    var count = 0;
+pub fn num_neighbors(self: Self, vertex: *Vertex) i32 {
+    var count: i32 = 0;
     for (self.adjacency_list.items) |e| {
         if (e.a == vertex or e.b == vertex)
             count += 1;
