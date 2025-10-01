@@ -93,6 +93,10 @@ pub fn remove_vertex(self: *Self, vertex: *Vertex) void {
         _ = self.vertices.remove(vertex.*);
 }
 
+pub fn num_vertices(self: Self) usize {
+    return self.vertices.count();
+}
+
 pub fn num_neighbors(self: Self, vertex: *Vertex) i32 {
     var count: i32 = 0;
     for (self.adjacency_list.items) |e| {
@@ -139,19 +143,20 @@ pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
         _ = try file.write(e_string);
     }
     _ = try file.write("</graph>\n</graphml>");
+    file.close();
 }
 
 pub fn get_coloring_graph(self: Self, k: i32, allocator: std.mem.Allocator) !Self {
-    const num_vertices = self.vertices.count();
-    const num_permutations = std.math.pow(i32, k, @intCast(num_vertices));
+    const num_of_vertices = self.num_vertices();
+    const num_permutations = std.math.pow(i32, k, @intCast(num_of_vertices));
 
-    const coloring: []i32 = try allocator.alloc(i32, num_vertices);
+    const coloring: []i32 = try allocator.alloc(i32, num_of_vertices);
     defer allocator.free(coloring);
 
     var new_graph = try Self.init(allocator);
 
     for (0..@intCast(num_permutations)) |num| {
-        for (0..@intCast(num_vertices)) |i| {
+        for (0..@intCast(num_of_vertices)) |i| {
             const digit = @mod(@divFloor(@as(i32, @intCast(num)), std.math.pow(i32, k, @intCast(i))), k);
             coloring[i] = digit;
         }
@@ -167,7 +172,7 @@ pub fn get_coloring_graph(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
             const col2 = b.key_ptr.label;
 
             var diff: i32 = 0;
-            for (0..@intCast(num_vertices)) |i| {
+            for (0..@intCast(num_of_vertices)) |i| {
                 const digit1 = @mod(@divFloor(@as(i32, @intCast(col1)), std.math.pow(i32, k, @intCast(i))), k);
                 const digit2 = @mod(@divFloor(@as(i32, @intCast(col2)), std.math.pow(i32, k, @intCast(i))), k);
                 if (digit1 != digit2)
@@ -179,7 +184,7 @@ pub fn get_coloring_graph(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
         }
     }
 
-    new_graph.num_original_vertices = @intCast(self.vertices.count());
+    new_graph.num_original_vertices = @intCast(self.num_vertices());
 
     return new_graph;
 }
