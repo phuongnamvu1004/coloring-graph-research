@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Eigen = @import("eigen.zig");
+
 const Self = @This();
 
 const Vertex = struct {
@@ -262,6 +264,22 @@ pub fn debug_print(self: Self) void {
         std.debug.print("\t{{{d}, {d}}}\n", .{ e.a.id, e.b.id });
     }
     std.debug.print("}}\n", .{});
+}
+
+pub fn laplacian_matrix(self: Self, gpa: std.mem.Allocator) !Eigen {
+    var laplacian = try Eigen.init(self.num_vertices(), gpa);
+    laplacian.zero();
+
+    for (self.adjacency_list.items) |e| {
+        laplacian.get(@intCast(e.a.id), @intCast(e.b.id)).* = -1;
+        laplacian.get(@intCast(e.b.id), @intCast(e.a.id)).* = -1;
+    }
+
+    var it = self.vertices.iterator();
+    while (it.next()) |v| {
+        laplacian.get(@intCast(v.key_ptr.id), @intCast(v.key_ptr.id)).* = @floatFromInt(self.num_neighbors(v.key_ptr));
+    }
+    return laplacian;
 }
 
 fn itoa(value: i64, buf: []u8, base: i32, digits: i32) []u8 { // modified from https://ziggit.dev/t/how-do-i-write-this-itoa-better/7560/4

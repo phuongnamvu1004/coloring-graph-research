@@ -61,26 +61,13 @@ pub fn main() !void {
     var coloring_graph = try graph.get_coloring_graph(k, gpa);
     defer coloring_graph.deinit();
 
-    var coloring_laplacian = try Eigen.init(coloring_graph.num_vertices(), gpa);
+    var coloring_laplacian = try coloring_graph.laplacian_matrix(gpa);
     defer coloring_laplacian.deinit(gpa);
 
-    coloring_laplacian.zero();
-
-    for (coloring_graph.adjacency_list.items) |e| {
-        coloring_laplacian.get(@intCast(e.a.id), @intCast(e.b.id)).* = -1;
-        coloring_laplacian.get(@intCast(e.b.id), @intCast(e.a.id)).* = -1;
-    }
-
-    var it = coloring_graph.vertices.iterator();
-    while (it.next()) |v| {
-        coloring_laplacian.get(@intCast(v.key_ptr.id), @intCast(v.key_ptr.id)).* = @floatFromInt(coloring_graph.num_neighbors(v.key_ptr));
-    }
-
-    var eigens = try coloring_laplacian.compute_eigenvalues(gpa);
-    defer eigens.deinit(gpa);
-
-    for (0..eigens.size) |i| {
-        std.debug.print("{d} ", .{eigens.get(i, i).*});
+    var eigens_iterator = try coloring_laplacian.get_eigenvalues(gpa);
+    defer eigens_iterator.deinit(gpa);
+    while (eigens_iterator.next()) |e| {
+        std.debug.print("{d} ", .{e});
     }
     std.debug.print("\n", .{});
 

@@ -32,6 +32,10 @@ pub fn get(self: *Self, x: usize, y: usize) *f32 {
     return &self.values[y * self.size + x];
 }
 
+pub fn get_val(self: Self, x: usize, y: usize) f32 {
+    return self.values[y * self.size + x];
+}
+
 pub fn debug_print(self: *Self) void {
     for (0..self.size) |y| {
         for (0..self.size) |x| {
@@ -41,7 +45,7 @@ pub fn debug_print(self: *Self) void {
     }
 }
 
-pub fn compute_eigenvalues(self: *Self, gpa: std.mem.Allocator) !Self { // translated from https://www.cs.nthu.edu.tw/~cchen/ISA5305/Prog/eigen.c which is perhaps the ugliest code I've seen in my entire life
+pub fn compute_eigenvalues(self: Self, gpa: std.mem.Allocator) !Self { // translated from https://www.cs.nthu.edu.tw/~cchen/ISA5305/Prog/eigen.c which is perhaps the ugliest code I've seen in my entire life
     var ret = try Self.init(self.size, gpa);
     ret.set(self.values);
     const epsilon = 1e-22;
@@ -114,3 +118,29 @@ pub fn compute_eigenvalues(self: *Self, gpa: std.mem.Allocator) !Self { // trans
     }
     return ret;
 }
+
+pub fn get_eigenvalues(self: *Self, gpa: std.mem.Allocator) !EigenIterator {
+    const eigens = try self.compute_eigenvalues(gpa);
+    return .{
+        .matrix = eigens,
+        .pos = 0,
+    };
+}
+
+pub const EigenIterator = struct {
+    matrix: Self,
+    pos: usize,
+
+    pub fn next(self: *EigenIterator) ?f32 {
+        if (self.pos < self.matrix.size) {
+            self.pos += 1;
+            return self.matrix.get_val(self.pos - 1, self.pos - 1);
+        } else {
+            return null; // end of the matrix
+        }
+    }
+
+    pub fn deinit(self: *EigenIterator, gpa: std.mem.Allocator) void {
+        self.matrix.deinit(gpa);
+    }
+};
