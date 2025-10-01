@@ -6,6 +6,7 @@
 #include "eigen/Eigen/Core"
 #include "originalToColoring.h"
 #include "graphSketcher.h"
+#include "chromaticPolynomial.h"
 
 #include "eigen/Eigen/Dense"
 
@@ -27,6 +28,7 @@ int main() {
 	boost::add_edge(v2, v3, original_graph);
 
 	int k = 3;
+	// int k = 4; // uncomment to check for chromatic polynomial, should be 36
 
 	std::map<int, std::map<int, int>> adj_list;
 	std::set<int> special_vertex_classes;
@@ -65,6 +67,8 @@ int main() {
 	std::cout << laplacian_matrix << std::endl;
 
 	std::cout << adjacency_matrix.eigenvalues() << std::endl; // really small numbers might be actually 0
+
+	std::cout << "chromatic polynomial P(G, " << k << ") = " << compute_chromatic_polynomial(original_graph, k) << std::endl;
 
 	boost::dynamic_properties dp;
 	dp.property("color", get(vertex_color, coloring_graph));
