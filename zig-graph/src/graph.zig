@@ -79,6 +79,10 @@ pub const NeighborsIterator = struct {
         }
         return null; // at the end of the list
     }
+
+    pub fn reset(self: *NeighborsIterator) void {
+        self.current_index = 0;
+    }
 };
 
 pub fn remove_edge(self: *Self, edge: Edge) void {
@@ -304,4 +308,45 @@ fn itoa(value: i64, buf: []u8, base: i32, digits: i32) []u8 { // modified from h
         buf[pos] = '0';
     }
     return buf[pos..];
+}
+
+pub fn chromatic_polynomial(self: Self, k: i32, gpa: std.mem.Allocator) !i32 {
+    // base case: num edges = 0 -> return k ^ num vertices
+    if (self.num_edges() == 0) {
+        return std.math.pow(usize, @intCast(k), self.num_vertices())
+    }
+
+    // Chromatic Polynomial formula: P(G, k) = P(G - e, k) - P(G / e, k)
+    // get a random edge in the graph
+    var random_edge = self.adjacency_list[0]
+
+    var graph_del;
+    // Deletion
+    graph_del.remove_edge(random_edge);
+
+    // Contration
+    var graph_contract;
+    var u = random_edge.a;
+    var v = random_edge.b
+    graph_contract.contract_vertices(u, v)
+
+    return graph_del.chromatic_polynomial(k, gpa) - graph_contract.chromatic_polynomial(k, gpa);
+}
+
+fn contract_vertices(self: *Self, u: *Vertex, v: *Vertex, gpa: std.mem.Allocator) void {
+    var it = self.neighbors(u);
+
+    while (it.next()) |vertex| {
+        self.add_edge(*vertex, v); // already check if exists
+    }
+
+    // clear edges
+    // remove all edges to u
+    it.reset()
+    for (it.next()) |*vertex| {
+        self.remove_edge(.{u, vertex})
+    }
+
+    // remove u as a vertex 
+    self.remove_vertex(u);
 }
