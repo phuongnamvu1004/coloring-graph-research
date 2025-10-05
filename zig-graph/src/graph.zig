@@ -24,7 +24,7 @@ num_original_vertices: i32 = 0, // useful metadata for a couple functions
 pub fn init(gpa: std.mem.Allocator) !Self {
     return .{
         .adjacency_list = .empty,
-        .vertices = std.AutoHashMap(Vertex, void).init(gpa),
+        .vertices = .init(gpa),
         .allocator = gpa,
     };
 }
@@ -34,11 +34,43 @@ pub fn deinit(self: *Self) void {
     self.vertices.deinit();
 }
 
+pub fn copy(self: Self, gpa: std.mem.Allocator) !Self {
+    var new = try Self.init(gpa);
+
+    new.allocator = gpa;
+    new.num_original_vertices = self.num_original_vertices;
+
+    new.vertices = .init(gpa);
+    new.adjacency_list = try .initCapacity(gpa, 2);
+
+    var it = self.vertices.iterator();
+    while (it.next()) |v| {
+        var vertex = try new.add_vertex(v.key_ptr.label);
+        vertex.permutation = v.key_ptr.permutation;
+        vertex.id = v.key_ptr.id; // !
+    }
+
+    for (self.adjacency_list.items) |e| {
+        _ = try new.add_edge(new.get_vertex_by_id(e.a.id).?, new.get_vertex_by_id(e.b.id).?); // unwrapping is safe since I just added it
+    }
+
+    return new;
+}
+
 pub fn add_vertex(self: *Self, label: i32) !*Vertex {
     const new_vertex: Vertex = .{ .id = self.max_vertex_id, .label = label };
     try self.vertices.put(new_vertex, undefined);
     self.max_vertex_id += 1;
     return self.vertices.getKeyPtr(new_vertex).?; // will always be present
+}
+
+pub fn get_vertex_by_id(self: Self, id: i32) ?*Vertex {
+    var it = self.vertices.iterator();
+    while (it.next()) |v| {
+        if (v.key_ptr.id == id)
+            return v.key_ptr;
+    }
+    return null;
 }
 
 pub fn add_edge(self: *Self, a: *Vertex, b: *Vertex) !Edge {
@@ -85,9 +117,9 @@ pub const NeighborsIterator = struct {
     }
 };
 
-pub fn remove_edge(self: *Self, edge: Edge) void {
+pub fn remove_edge(self: *Self, a: *Vertex, b: *Vertex) void {
     for (0.., self.adjacency_list.items) |i, e| {
-        if (std.meta.eql(edge, e)) {
+        if ((e.a == a and e.b == b) or (e.a == b and e.b == a)) {
             _ = self.adjacency_list.swapRemove(i);
             return;
         }
@@ -312,41 +344,46 @@ fn itoa(value: i64, buf: []u8, base: i32, digits: i32) []u8 { // modified from h
 
 pub fn chromatic_polynomial(self: Self, k: i32, gpa: std.mem.Allocator) !i32 {
     // base case: num edges = 0 -> return k ^ num vertices
-    if (self.num_edges() == 0) {
-        return std.math.pow(usize, @intCast(k), self.num_vertices())
+    if (self.adjacency_list.items.len == 0) {
+        return std.math.pow(i32, k, @intCast(self.num_vertices()));
     }
 
     // Chromatic Polynomial formula: P(G, k) = P(G - e, k) - P(G / e, k)
     // get a random edge in the graph
-    var random_edge = self.adjacency_list[0]
 
-    var graph_del;
+    var graph_del = try self.copy(gpa);
+    defer graph_del.deinit();
+
     // Deletion
-    graph_del.remove_edge(random_edge);
+    const random_edge_del = graph_del.adjacency_list.items[0];
+    graph_del.remove_edge(random_edge_del.a, random_edge_del.b);
 
     // Contration
-    var graph_contract;
-    var u = random_edge.a;
-    var v = random_edge.b
-    graph_contract.contract_vertices(u, v)
+    var graph_contract = try graph_del.copy(gpa);
+    defer graph_contract.deinit();
 
-    return graph_del.chromatic_polynomial(k, gpa) - graph_contract.chromatic_polynomial(k, gpa);
+    const u = graph_contract.get_vertex_by_id(random_edge_del.a.id).?;
+    const v = graph_contract.get_vertex_by_id(random_edge_del.b.id).?;
+    try graph_contract.contract_vertices(u, v);
+
+    return try graph_del.chromatic_polynomial(k, gpa) - try graph_contract.chromatic_polynomial(k, gpa);
 }
 
-fn contract_vertices(self: *Self, u: *Vertex, v: *Vertex, gpa: std.mem.Allocator) void {
+pub fn contract_vertices(self: *Self, u: *Vertex, v: *Vertex) !void {
+    self.remove_edge(u, v); // in case
     var it = self.neighbors(u);
 
     while (it.next()) |vertex| {
-        self.add_edge(*vertex, v); // already check if exists
+        _ = try self.add_edge(vertex, v); // already check if exists
     }
 
     // clear edges
     // remove all edges to u
-    it.reset()
-    for (it.next()) |*vertex| {
-        self.remove_edge(.{u, vertex})
+    it.reset();
+    while (it.next()) |vertex| {
+        self.remove_edge(u, vertex);
     }
 
-    // remove u as a vertex 
+    // remove u as a vertex
     self.remove_vertex(u);
 }
