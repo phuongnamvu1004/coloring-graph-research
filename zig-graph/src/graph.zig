@@ -88,7 +88,7 @@ pub fn adjacent(self: Self, a: *Vertex, b: *Vertex) bool {
     return false;
 }
 
-pub fn neighbors(self: Self, vertex: *Vertex) NeighborsIterator {
+pub fn neighbors(self: *Self, vertex: *Vertex) NeighborsIterator {
     return NeighborsIterator{
         .g = self,
         .vertex = vertex,
@@ -97,7 +97,7 @@ pub fn neighbors(self: Self, vertex: *Vertex) NeighborsIterator {
 }
 
 pub const NeighborsIterator = struct {
-    g: Self, // graph
+    g: *Self, // graph
     vertex: *Vertex,
     current_index: usize,
 
@@ -128,7 +128,7 @@ pub fn remove_edge(self: *Self, a: *Vertex, b: *Vertex) void {
 
 pub fn remove_vertex(self: *Self, vertex: *Vertex) void {
     if (self.num_neighbors(vertex) == 0)
-        _ = self.vertices.remove(vertex.*);
+        _ = self.vertices.removeByPtr(vertex);
 }
 
 pub fn num_vertices(self: Self) usize {
@@ -138,7 +138,7 @@ pub fn num_vertices(self: Self) usize {
 pub fn num_neighbors(self: Self, vertex: *Vertex) i32 {
     var count: i32 = 0;
     for (self.adjacency_list.items) |e| {
-        if (e.a == vertex or e.b == vertex)
+        if (e.a.id == vertex.id or e.b.id == vertex.id)
             count += 1;
     }
     return count;
@@ -358,7 +358,7 @@ pub fn chromatic_polynomial(self: Self, k: i32, gpa: std.mem.Allocator) !i32 {
     const random_edge_del = graph_del.adjacency_list.items[0];
     graph_del.remove_edge(random_edge_del.a, random_edge_del.b);
 
-    // Contration
+    // Contraction
     var graph_contract = try graph_del.copy(gpa);
     defer graph_contract.deinit();
 

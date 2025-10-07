@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Self = @This();
 
-const num_runs = 100;
+const num_runs = 1000000;
 
 size: usize,
 values: []f32,
