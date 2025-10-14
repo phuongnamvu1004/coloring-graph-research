@@ -9,9 +9,9 @@ const Vertex = struct {
     label: i32,
     permutation: i32 = -1,
 };
-const Edge = struct {
-    a: *Vertex,
-    b: *Vertex,
+const Edge = struct { // adjacent vertex ids
+    a_id: i32,
+    b_id: i32,
 };
 const Color = i32;
 
@@ -43,52 +43,60 @@ pub fn copy(self: Self, gpa: std.mem.Allocator) !Self {
     new.vertices = .init(gpa);
     new.adjacency_list = try .initCapacity(gpa, 2);
 
-    var it = self.vertices.iterator();
+    var it = self.vertices.keyIterator();
     while (it.next()) |v| {
-        var vertex = try new.add_vertex(v.key_ptr.label);
-        vertex.permutation = v.key_ptr.permutation;
-        vertex.id = v.key_ptr.id; // !
+        try new.vertices.put(v.*, undefined);
     }
 
     for (self.adjacency_list.items) |e| {
-        _ = try new.add_edge(new.get_vertex_by_id(e.a.id).?, new.get_vertex_by_id(e.b.id).?); // unwrapping is safe since I just added it
+        try new.add_edge_by_id(e.a_id, e.b_id);
     }
 
     return new;
 }
 
-pub fn add_vertex(self: *Self, label: i32) !*Vertex {
+pub fn add_vertex(self: *Self, label: i32) !Vertex {
     const new_vertex: Vertex = .{ .id = self.max_vertex_id, .label = label };
     try self.vertices.put(new_vertex, undefined);
     self.max_vertex_id += 1;
-    return self.vertices.getKeyPtr(new_vertex).?; // will always be present
+    return new_vertex; // by copy
+}
+
+pub fn add_vertex_with_ptr(self: *Self, label: i32) !*Vertex { // usage discouraged unless needed, pointers invalidated quickly
+    const new_vertex: Vertex = .{ .id = self.max_vertex_id, .label = label };
+    try self.vertices.put(new_vertex, undefined);
+    self.max_vertex_id += 1;
+    return self.vertices.getKeyPtr(new_vertex).?;
 }
 
 pub fn get_vertex_by_id(self: Self, id: i32) ?*Vertex {
-    var it = self.vertices.iterator();
+    var it = self.vertices.keyIterator();
     while (it.next()) |v| {
-        if (v.key_ptr.id == id)
-            return v.key_ptr;
+        if (v.id == id)
+            return v;
     }
     return null;
 }
 
-pub fn add_edge(self: *Self, a: *Vertex, b: *Vertex) !Edge {
+pub fn add_edge(self: *Self, a: Vertex, b: Vertex) !void {
     if (!self.adjacent(a, b)) {
-        try self.adjacency_list.append(self.allocator, .{ .a = a, .b = b });
+        try self.adjacency_list.append(self.allocator, .{ .a_id = a.id, .b_id = b.id });
     }
-    return .{ .a = a, .b = b };
 }
 
-pub fn adjacent(self: Self, a: *Vertex, b: *Vertex) bool {
+pub fn add_edge_by_id(self: *Self, a_id: i32, b_id: i32) !void {
+    try self.adjacency_list.append(self.allocator, .{ .a_id = a_id, .b_id = b_id });
+}
+
+pub fn adjacent(self: Self, a: Vertex, b: Vertex) bool {
     for (self.adjacency_list.items) |edge| {
-        if (std.meta.eql(edge, .{ .a = a, .b = b }) or std.meta.eql(edge, .{ .a = b, .b = a }))
+        if ((edge.a_id == a.id and edge.b_id == b.id) or (edge.a_id == b.id and edge.b_id == a.id))
             return true;
     }
     return false;
 }
 
-pub fn neighbors(self: *Self, vertex: *Vertex) NeighborsIterator {
+pub fn neighbors(self: *Self, vertex: Vertex) NeighborsIterator {
     return NeighborsIterator{
         .g = self,
         .vertex = vertex,
@@ -98,16 +106,16 @@ pub fn neighbors(self: *Self, vertex: *Vertex) NeighborsIterator {
 
 pub const NeighborsIterator = struct {
     g: *Self, // graph
-    vertex: *Vertex,
+    vertex: Vertex,
     current_index: usize,
 
-    pub fn next(self: *NeighborsIterator) ?*Vertex {
+    pub fn next(self: *NeighborsIterator) ?Vertex {
         for (self.g.adjacency_list.items[self.current_index..]) |e| {
             self.current_index += 1;
-            if (e.a == self.vertex)
-                return e.b;
-            if (e.b == self.vertex)
-                return e.a;
+            if (e.a_id == self.vertex.id)
+                return self.g.get_vertex_by_id(e.b_id).?.*;
+            if (e.b_id == self.vertex.id)
+                return self.g.get_vertex_by_id(e.a_id).?.*;
         }
         return null; // at the end of the list
     }
@@ -117,28 +125,37 @@ pub const NeighborsIterator = struct {
     }
 };
 
-pub fn remove_edge(self: *Self, a: *Vertex, b: *Vertex) void {
+pub fn remove_edge(self: *Self, a: Vertex, b: Vertex) void {
     for (0.., self.adjacency_list.items) |i, e| {
-        if ((e.a == a and e.b == b) or (e.a == b and e.b == a)) {
+        if ((e.a_id == a.id and e.b_id == b.id) or (e.a_id == b.id and e.b_id == a.id)) {
             _ = self.adjacency_list.swapRemove(i);
             return;
         }
     }
 }
 
-pub fn remove_vertex(self: *Self, vertex: *Vertex) void {
+pub fn remove_edge_by_id(self: *Self, a_id: i32, b_id: i32) void {
+    for (0.., self.adjacency_list.items) |i, e| {
+        if ((e.a_id == a_id and e.b_id == b_id) or (e.a_id == b_id and e.b_id == a_id)) {
+            _ = self.adjacency_list.swapRemove(i);
+            return;
+        }
+    }
+}
+
+pub fn remove_vertex(self: *Self, vertex: Vertex) void {
     if (self.num_neighbors(vertex) == 0)
-        _ = self.vertices.removeByPtr(vertex);
+        _ = self.vertices.remove(vertex);
 }
 
 pub fn num_vertices(self: Self) usize {
     return self.vertices.count();
 }
 
-pub fn num_neighbors(self: Self, vertex: *Vertex) i32 {
+pub fn num_neighbors(self: Self, vertex: Vertex) i32 {
     var count: i32 = 0;
     for (self.adjacency_list.items) |e| {
-        if (e.a.id == vertex.id or e.b.id == vertex.id)
+        if (e.a_id == vertex.id or e.b_id == vertex.id)
             count += 1;
     }
     return count;
@@ -146,14 +163,15 @@ pub fn num_neighbors(self: Self, vertex: *Vertex) i32 {
 
 pub fn is_coloring_valid(self: Self, coloring: []const Color) bool {
     for (self.adjacency_list.items) |e| {
-        if (coloring[@intCast(e.a.id)] == coloring[@intCast(e.b.id)])
+        if (coloring[@intCast(e.a_id)] == coloring[@intCast(e.b_id)])
             return false;
     }
     return true;
 }
 
-pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
+pub fn print_as_graphml(self: Self, filename: []const u8, k: i32) !void {
     var file = try std.fs.cwd().createFile(filename, .{});
+    defer file.close();
     _ = try file.write(
         \\<?xml version="1.0" encoding="UTF-8"?>
         \\<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
@@ -162,7 +180,7 @@ pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
         \\<key id="d0" for="node" attr.name="coloring" attr.type="string">
         \\<default>none</default>
         \\</key>
-        \\<key id="d1" for="node" attr.name="permutation" attr.type="int">
+        \\<key id="d1" for="node" attr.name="permutation" attr.type="string">
         \\<default>-1</default>
         \\</key>
         \\<graph id="G" edgedefault="undirected">\n
@@ -171,24 +189,23 @@ pub fn print_as_graphml(self: Self, filename: [:0]const u8, k: i32) !void {
     var buf: [100:0]u8 = undefined;
     var itoabuf: [100:0]u8 = undefined;
     while (it.next()) |v| {
-        const coloring_str = itoa(v.*.label, &itoabuf, k, self.num_original_vertices);
-        const v_string = try std.fmt.bufPrint(&buf, "<node id=\"{d}\"><data key=\"d0\">{s}</data><data key=\"d1\">{d}</data></node>\n", .{ v.id, coloring_str, v.permutation });
+        const coloring_str = itoa(v.label, &itoabuf, k, self.num_original_vertices);
+        const v_string = try std.fmt.bufPrint(&buf, "<node id=\"{d}\"><data key=\"d0\">\"{s}\"</data><data key=\"d1\">\"{d}\"</data></node>\n", .{ v.id, coloring_str, v.permutation });
         _ = try file.write(v_string);
     }
 
     for (0.., self.adjacency_list.items) |i, e| {
-        const e_string = try std.fmt.bufPrint(&buf, "<edge id=\"{d}\" source=\"{d}\" target=\"{d}\"/>\n", .{ i, e.a.id, e.b.id });
+        const e_string = try std.fmt.bufPrint(&buf, "<edge id=\"{d}\" source=\"{d}\" target=\"{d}\"/>\n", .{ i, e.a_id, e.b_id });
         _ = try file.write(e_string);
     }
     _ = try file.write("</graph>\n</graphml>");
-    file.close();
 }
 
 pub fn get_coloring_graph(self: Self, k: i32, allocator: std.mem.Allocator) !Self {
     const num_of_vertices = self.num_vertices();
     const num_permutations = std.math.pow(i32, k, @intCast(num_of_vertices));
 
-    const coloring: []i32 = try allocator.alloc(i32, num_of_vertices);
+    const coloring: []Color = try allocator.alloc(Color, num_of_vertices);
     defer allocator.free(coloring);
 
     var new_graph = try Self.init(allocator);
@@ -218,7 +235,7 @@ pub fn get_coloring_graph(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
             }
 
             if (diff == 1)
-                _ = try new_graph.add_edge(a.key_ptr, b.key_ptr);
+                _ = try new_graph.add_edge(a.key_ptr.*, b.key_ptr.*);
         }
     }
 
@@ -270,8 +287,8 @@ pub fn bell_from_coloring(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
     }
 
     for (0.., permutations.items) |i, p| {
-        var v = try bell_graph.add_vertex(@intCast(p));
-        v.permutation = @intCast(i);
+        const v = try bell_graph.add_vertex(@intCast(p));
+        bell_graph.get_vertex_by_id(v.id).?.permutation = @intCast(i);
     }
 
     var bell_it1 = bell_graph.vertices.iterator();
@@ -280,8 +297,10 @@ pub fn bell_from_coloring(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
         while (bell_it2.next()) |bell_b| {
             if (bell_a.key_ptr.permutation != bell_b.key_ptr.permutation) {
                 for (self.adjacency_list.items) |e| { // look through adjacent nodes in coloring graph
-                    if ((e.a.permutation == bell_a.key_ptr.permutation and bell_b.key_ptr.permutation == e.b.permutation) or (e.a.permutation == bell_b.key_ptr.permutation and bell_a.key_ptr.permutation == e.b.permutation)) { // the or is probably unnecessary as it will look through both orders
-                        _ = try bell_graph.add_edge(bell_a.key_ptr, bell_b.key_ptr);
+                    const a_permutation = self.get_vertex_by_id(e.a_id).?.permutation;
+                    const b_permutation = self.get_vertex_by_id(e.b_id).?.permutation;
+                    if ((a_permutation == bell_a.key_ptr.permutation and bell_b.key_ptr.permutation == b_permutation) or (a_permutation == bell_b.key_ptr.permutation and bell_a.key_ptr.permutation == b_permutation)) { // the or is probably unnecessary as it will look through both orders
+                        _ = try bell_graph.add_edge(bell_a.key_ptr.*, bell_b.key_ptr.*);
                         // if (e.a.permutation == 1 and e.b.permutation == 7 or e.a.permutation == 7 and e.b.permutation == 1)
                         //     std.debug.print("{d} {d}\n", .{ e.a.id, e.b.id });
                         break;
@@ -297,7 +316,7 @@ pub fn bell_from_coloring(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
 pub fn debug_print(self: Self) void {
     std.debug.print("edges: {{\n", .{});
     for (self.adjacency_list.items) |e| {
-        std.debug.print("\t{{{d}, {d}}}\n", .{ e.a.id, e.b.id });
+        std.debug.print("\t{{{d}, {d}}}\n", .{ e.a_id, e.b_id });
     }
     std.debug.print("}}\n", .{});
 }
@@ -307,13 +326,13 @@ pub fn laplacian_matrix(self: Self, gpa: std.mem.Allocator) !Eigen {
     laplacian.zero();
 
     for (self.adjacency_list.items) |e| {
-        laplacian.get(@intCast(e.a.id), @intCast(e.b.id)).* = -1;
-        laplacian.get(@intCast(e.b.id), @intCast(e.a.id)).* = -1;
+        laplacian.get(@intCast(e.a_id), @intCast(e.b_id)).* = -1;
+        laplacian.get(@intCast(e.b_id), @intCast(e.a_id)).* = -1;
     }
 
     var it = self.vertices.iterator();
     while (it.next()) |v| {
-        laplacian.get(@intCast(v.key_ptr.id), @intCast(v.key_ptr.id)).* = @floatFromInt(self.num_neighbors(v.key_ptr));
+        laplacian.get(@intCast(v.key_ptr.id), @intCast(v.key_ptr.id)).* = @floatFromInt(self.num_neighbors(v.key_ptr.*));
     }
     return laplacian;
 }
@@ -356,20 +375,22 @@ pub fn chromatic_polynomial(self: Self, k: i32, gpa: std.mem.Allocator) !i32 {
 
     // Deletion
     const random_edge_del = graph_del.adjacency_list.items[0];
-    graph_del.remove_edge(random_edge_del.a, random_edge_del.b);
+    const u_del = graph_del.get_vertex_by_id(random_edge_del.a_id).?.*;
+    const v_del = graph_del.get_vertex_by_id(random_edge_del.b_id).?.*;
+    graph_del.remove_edge(u_del, v_del);
 
     // Contraction
     var graph_contract = try graph_del.copy(gpa);
     defer graph_contract.deinit();
 
-    const u = graph_contract.get_vertex_by_id(random_edge_del.a.id).?;
-    const v = graph_contract.get_vertex_by_id(random_edge_del.b.id).?;
-    try graph_contract.contract_vertices(u, v);
+    const u_cont = graph_contract.get_vertex_by_id(random_edge_del.a_id).?.*;
+    const v_cont = graph_contract.get_vertex_by_id(random_edge_del.b_id).?.*;
+    try graph_contract.contract_vertices(u_cont, v_cont);
 
     return try graph_del.chromatic_polynomial(k, gpa) - try graph_contract.chromatic_polynomial(k, gpa);
 }
 
-pub fn contract_vertices(self: *Self, u: *Vertex, v: *Vertex) !void {
+pub fn contract_vertices(self: *Self, u: Vertex, v: Vertex) !void {
     self.remove_edge(u, v); // in case
     var it = self.neighbors(u);
 
