@@ -5,13 +5,38 @@ const zlm = @import("zlm").as(f64);
 
 const Eigen = @import("eigen.zig");
 
+const GraphGen = @import("graph-generator.zig");
+
 pub fn main() !void {
     var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer allocator.deinit();
 
     const gpa = allocator.allocator();
 
-    var graph = try Graph.init(gpa);
+    // var graph = try Graph.init(gpa);
+    // defer graph.deinit();
+
+    // const v1 = try graph.add_vertex(0);
+    // const v2 = try graph.add_vertex(1);
+    // const v3 = try graph.add_vertex(1);
+    // const v4 = try graph.add_vertex(1);
+
+    // _ = try graph.add_edge(v1, v2);
+    // _ = try graph.add_edge(v2, v3);
+    // _ = try graph.add_edge(v4, v3);
+    // _ = try graph.add_edge(v1, v3);
+
+    const num_vertices: i32 = 4;
+    const labels = [_]i32{ 0, 1, 2, 3 };
+    const edges = [_][2]i32{
+        .{1, 0},
+        .{1, 2},
+        .{1, 3},
+    };
+
+    const k = 4;
+
+    var graph = try GraphGen.graph_from_edge_pairs(gpa, num_vertices, &edges, &labels);
     defer graph.deinit();
 
     var v1 = try graph.add_vertex(0);
