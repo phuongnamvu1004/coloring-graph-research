@@ -14,41 +14,44 @@ pub fn main() !void {
     var graph = try Graph.init(gpa);
     defer graph.deinit();
 
-    var v1 = try graph.add_vertex(0);
+    const v1 = try graph.add_vertex(0);
+    const v2 = try graph.add_vertex(0);
+    const v3 = try graph.add_vertex(0);
+    const v4 = try graph.add_vertex(0);
+    // const v5 = try graph.add_vertex(0);
 
-    const k = 3;
+    try graph.add_edge(v1, v2);
+    try graph.add_edge(v2, v3);
+    try graph.add_edge(v3, v4);
+    try graph.add_edge(v4, v1);
+    // try graph.add_edge(v4, v3);
 
-    var buf: [100]u8 = undefined;
+    const k = 4;
 
-    inline for (1..10) |i| {
-        std.debug.print("i={d}\n", .{i});
-        const filename = try std.fmt.bufPrint(&buf, "data{d}", .{i});
+    var coloring_graph = try graph.get_coloring_graph(k, gpa);
+    defer coloring_graph.deinit();
 
-        std.debug.print("coloring...\t\tk={d}\n", .{k});
-        var coloring_graph = try graph.get_coloring_graph(k, gpa);
-        defer coloring_graph.deinit();
+    var bell_graph = try coloring_graph.bell_from_coloring(k, gpa);
+    defer bell_graph.deinit();
 
-        std.debug.print("bell...\t\t\tk={d}\n", .{k});
-        var bell_graph = try coloring_graph.bell_from_coloring(k, gpa);
-        defer bell_graph.deinit();
+    var test_matrix = try Eigen.init(5, gpa);
+    test_matrix.set(&.{
+        1,      0.5,   0.25, 0.125, 0.0625,
+        0.5,    1,     0.5,  0.25,  0.125,
+        0.25,   0.5,   1,    0.5,   0.25,
+        0.125,  0.25,  0.5,  1,     0.5,
+        0.0625, 0.125, 0.25, 0.5,   1,
+    });
 
-        var file = try std.fs.cwd().createFile(filename, .{});
-        defer file.close();
+    var eigens = try Eigen.init(5, gpa);
+    var eigenvecs = try Eigen.init(5, gpa);
+    test_matrix.compute_eigenvalues(&eigens, &eigenvecs);
 
-        var laplacian = try bell_graph.laplacian_matrix(gpa);
-        defer laplacian.deinit(gpa);
+    eigens.debug_print();
+    std.debug.print("-----\n", .{});
+    eigenvecs.debug_print();
 
-        var it = try laplacian.get_eigenvalues(gpa);
-        defer it.deinit(gpa);
-
-        while (it.next()) |e| {
-            _ = try file.writeAll(try std.fmt.bufPrint(&buf, "{d}\n", .{e}));
-        }
-
-        const v2 = try graph.add_vertex(0);
-        _ = try graph.add_edge(v1, v2);
-        v1 = v2;
-
-        graph.debug_print();
-    }
+    std.debug.print("----\n", .{});
+    var thing = try Eigen.original_from_eigens(eigens, eigenvecs, gpa);
+    thing.debug_print();
 }

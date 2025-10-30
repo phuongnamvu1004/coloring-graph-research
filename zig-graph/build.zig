@@ -5,6 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const zlm = b.dependency("zlm", .{});
+    const zla = b.dependency("zla", .{});
 
     const exe = b.addExecutable(.{
         .name = "zig_graph",
@@ -14,6 +15,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "zlm", .module = zlm.module("zlm") },
+                .{ .name = "zla", .module = zla.module("zla") },
             },
         }),
     });
