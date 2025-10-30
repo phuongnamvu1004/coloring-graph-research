@@ -4,7 +4,7 @@ const Eigen = @import("eigen.zig");
 
 const Self = @This();
 
-const Vertex = struct {
+pub const Vertex = struct {
     id: i32,
     label: i32,
     permutation: i32 = -1,
