@@ -42,7 +42,7 @@ pub fn get_val(self: Self, x: usize, y: usize) f64 {
 pub fn debug_print(self: *Self) void {
     for (0..self.num_cols) |y| {
         for (0..self.num_rows) |x| {
-            std.debug.print("{d} ", .{self.get(x, y).*});
+            std.debug.print("{d:<.5} ", .{self.get(x, y).*});
         }
         std.debug.print("\n", .{});
     }
@@ -169,7 +169,7 @@ pub fn transpose(self: Self, gpa: std.mem.Allocator) !Self {
     }
 
     return ret;
-} 
+}
 
 pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Allocator) !Self {
     // var fancy_eigenvals = zla.Mat(f64, 5, 5).zero;
@@ -197,8 +197,6 @@ pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Alloc
     defer ret1.deinit(gpa);
 
     const ret2 = try ret1.mul(transposed, gpa);
-
-    
 
     // for (0..eigenvals.size) |i| {
     //     for (0..eigenvecs.size) |j| {
