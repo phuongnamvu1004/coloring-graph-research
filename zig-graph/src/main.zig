@@ -23,14 +23,21 @@ pub fn main() !void {
     });
 
     var eigens = try Eigen.init(5, 5, gpa);
+    defer eigens.deinit(gpa);
+
     var eigenvecs = try Eigen.init(5, 5, gpa);
+    defer eigenvecs.deinit(gpa);
+
     test_matrix.compute_eigenvalues(&eigens, &eigenvecs);
 
     eigens.debug_print();
     std.debug.print("-----\n", .{});
-    eigenvecs.debug_print();
 
+    eigenvecs.debug_print();
     std.debug.print("----\n", .{});
+
     var thing = try Eigen.original_from_eigens(eigens, eigenvecs, gpa);
+    defer thing.deinit(gpa);
+
     thing.debug_print();
 }

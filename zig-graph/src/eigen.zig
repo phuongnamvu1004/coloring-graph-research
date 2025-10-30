@@ -172,36 +172,11 @@ pub fn transpose(self: Self, gpa: std.mem.Allocator) !Self {
 }
 
 pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Allocator) !Self {
-    // var fancy_eigenvals = zla.Mat(f64, 5, 5).zero;
-    // for (0..eigenvals.num_rows) |i| {
-    //     for (0..eigenvals.num_cols) |j| {
-    //         fancy_eigenvals.items[j][i] = eigenvals.get_val(i, j);
-    //     }
-    // }
-
-    // var fancy_eigenvecs = zla.Mat(f64, 5, 5).zero;
-    // for (0..eigenvecs.size) |i| {
-    //     for (0..eigenvecs.size) |j| {
-    //         fancy_eigenvecs.items[j][i] = eigenvecs.get_val(i, j);
-    //     }
-    // }
-
-    // const fancy_ret = fancy_eigenvecs.mul(fancy_eigenvals).mul(fancy_eigenvecs.transpose());
-
     const transposed = try eigenvecs.transpose(gpa);
-
     defer transposed.deinit(gpa);
 
-    const ret1 = try eigenvecs.mul(eigenvals, gpa);
+    const step1 = try eigenvecs.mul(eigenvals, gpa);
+    defer step1.deinit(gpa);
 
-    defer ret1.deinit(gpa);
-
-    const ret2 = try ret1.mul(transposed, gpa);
-
-    // for (0..eigenvals.size) |i| {
-    //     for (0..eigenvecs.size) |j| {
-    //         ret.get(i, j).* = fancy_ret.items[j][i];
-    //     }
-    // }
-    return ret2;
+    return try step1.mul(transposed, gpa);
 }
