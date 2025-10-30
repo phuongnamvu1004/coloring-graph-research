@@ -13,53 +13,7 @@ pub fn main() !void {
 
     const gpa = allocator.allocator();
 
-    // var graph = try Graph.init(gpa);
-    // defer graph.deinit();
-
-    // const v1 = try graph.add_vertex(0);
-    // const v2 = try graph.add_vertex(1);
-    // const v3 = try graph.add_vertex(1);
-    // const v4 = try graph.add_vertex(1);
-
-    // _ = try graph.add_edge(v1, v2);
-    // _ = try graph.add_edge(v2, v3);
-    // _ = try graph.add_edge(v4, v3);
-    // _ = try graph.add_edge(v1, v3);
-
-    const num_vertices: i32 = 4;
-    const labels = [_]i32{ 0, 1, 2, 3 };
-    const edges = [_][2]i32{
-        .{1, 0},
-        .{1, 2},
-        .{1, 3},
-    };
-
-    const k = 4;
-
-    var graph = try GraphGen.graph_from_edge_pairs(gpa, num_vertices, &edges, &labels);
-    defer graph.deinit();
-
-    const v1 = try graph.add_vertex(0);
-    const v2 = try graph.add_vertex(0);
-    const v3 = try graph.add_vertex(0);
-    const v4 = try graph.add_vertex(0);
-    // const v5 = try graph.add_vertex(0);
-
-    try graph.add_edge(v1, v2);
-    try graph.add_edge(v2, v3);
-    try graph.add_edge(v3, v4);
-    try graph.add_edge(v4, v1);
-    // try graph.add_edge(v4, v3);
-
-    const k = 4;
-
-    var coloring_graph = try graph.get_coloring_graph(k, gpa);
-    defer coloring_graph.deinit();
-
-    var bell_graph = try coloring_graph.bell_from_coloring(k, gpa);
-    defer bell_graph.deinit();
-
-    var test_matrix = try Eigen.init(5, gpa);
+    var test_matrix = try Eigen.init(5, 5, gpa);
     test_matrix.set(&.{
         1,      0.5,   0.25, 0.125, 0.0625,
         0.5,    1,     0.5,  0.25,  0.125,
@@ -68,8 +22,8 @@ pub fn main() !void {
         0.0625, 0.125, 0.25, 0.5,   1,
     });
 
-    var eigens = try Eigen.init(5, gpa);
-    var eigenvecs = try Eigen.init(5, gpa);
+    var eigens = try Eigen.init(5, 5, gpa);
+    var eigenvecs = try Eigen.init(5,5, gpa);
     test_matrix.compute_eigenvalues(&eigens, &eigenvecs);
 
     eigens.debug_print();

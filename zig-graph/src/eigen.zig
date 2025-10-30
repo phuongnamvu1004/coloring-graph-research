@@ -5,13 +5,15 @@ const Self = @This();
 
 const num_runs = 10000;
 
-size: usize,
+num_rows: usize,
+num_cols: usize,
 values: []f64,
 
-pub fn init(size: usize, gpa: std.mem.Allocator) !Self {
+pub fn init(num_rows: usize, num_cols: usize, gpa: std.mem.Allocator) !Self {
     return .{
-        .size = size,
-        .values = try gpa.alloc(f64, size * size),
+        .num_rows = num_rows,
+        .num_cols = num_cols,
+        .values = try gpa.alloc(f64, num_rows * num_cols),
     };
 }
 
@@ -30,16 +32,16 @@ pub fn set(self: *Self, values: []const f64) void {
 }
 
 pub fn get(self: *Self, x: usize, y: usize) *f64 {
-    return &self.values[y * self.size + x];
+    return &self.values[y * self.num_cols + x];
 }
 
 pub fn get_val(self: Self, x: usize, y: usize) f64 {
-    return self.values[y * self.size + x];
+    return self.values[y * self.num_cols + x];
 }
 
 pub fn debug_print(self: *Self) void {
-    for (0..self.size) |y| {
-        for (0..self.size) |x| {
+    for (0..self.num_cols) |y| {
+        for (0..self.num_rows) |x| {
             std.debug.print("{d} ", .{self.get(x, y).*});
         }
         std.debug.print("\n", .{});
@@ -60,8 +62,8 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
     var s: f64 = 0;
     var tau: f64 = 0;
 
-    for (0..self.size) |i| {
-        for (0..self.size) |j| {
+    for (0..self.num_rows) |i| {
+        for (0..self.num_cols) |j| {
             if (i == j) {
                 eigenvecs.get(i, j).* = 1;
             } else {
@@ -74,8 +76,8 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
         var tmax: f64 = -1;
         var sum: f64 = 0;
 
-        for (0..eigenvals.size) |i| {
-            for (i + 1..eigenvals.size) |j| {
+        for (0..eigenvals.num_rows) |i| {
+            for (i + 1..eigenvals.num_cols) |j| {
                 t = @abs(eigenvals.get(i, j).*);
                 sum += t * t;
                 if (t > tmax) {
@@ -105,7 +107,7 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
 
         for (0..p) |r|
             eigenvals.get(p, r).* = c * eigenvals.get(r, p).* - s * eigenvals.get(r, q).*;
-        for (p + 1..eigenvals.size) |r| {
+        for (p + 1..eigenvals.num_rows) |r| {
             if (r != q)
                 eigenvals.get(r, p).* = c * eigenvals.get(p, r).* - s * eigenvals.get(q, r).*;
         }
@@ -114,20 +116,20 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
             eigenvals.get(q, r).* = s * eigenvals.get(r, p).* + c * eigenvals.get(r, q).*;
         for (p + 1..q) |r|
             eigenvals.get(q, r).* = s * eigenvals.get(p, r).* + c * eigenvals.get(r, q).*;
-        for (q + 1..eigenvals.size) |r|
+        for (q + 1..eigenvals.num_rows) |r|
             eigenvals.get(r, q).* = s * eigenvals.get(p, r).* + c * eigenvals.get(q, r).*;
 
         eigenvals.get(p, p).* = eigenvals.get(p, p).* - t * eigenvals.get(p, q).*;
         eigenvals.get(q, q).* = eigenvals.get(q, q).* + t * eigenvals.get(p, q).*;
         eigenvals.get(q, p).* = 0;
 
-        for (0..eigenvals.size) |i| {
-            for (i + 1..eigenvals.size) |j| {
+        for (0..eigenvals.num_rows) |i| {
+            for (i + 1..eigenvals.num_rows) |j| {
                 eigenvals.get(i, j).* = eigenvals.get(j, i).*;
             }
         }
 
-        for (0..eigenvals.size) |i| {
+        for (0..eigenvals.num_rows) |i| {
             const xp = eigenvecs.get_val(i, p);
             const xq = eigenvecs.get_val(i, q);
             eigenvecs.get(i, p).* = c * xp - s * xq;
@@ -136,29 +138,72 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
     }
 }
 
-pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Allocator) !Self {
-    var ret = try Self.init(eigenvals.size, gpa);
+pub fn mul(self: Self, other: Self, gpa: std.mem.Allocator) !Self {
+    const self_num_rows = self.num_rows;
 
-    var fancy_eigenvals = zla.Mat(f64, 5, 5).zero;
-    for (0..eigenvals.size) |i| {
-        for (0..eigenvals.size) |j| {
-            fancy_eigenvals.items[j][i] = eigenvals.get_val(i, j);
+    const other_num_cols = other.num_cols;
+
+    var ret = try Self.init(self_num_rows, other_num_cols, gpa);
+
+    for (0..self_num_rows) |i| {
+        for (0..other_num_cols) |j| {
+            var dot_prod: f64 = 0;
+            for (0..self.num_cols) |col| {
+                dot_prod += self.get_val(i, col) * other.get_val(col, j);
+            }
+
+            ret.get(i, j).* = dot_prod;
         }
     }
 
-    var fancy_eigenvecs = zla.Mat(f64, 5, 5).zero;
-    for (0..eigenvecs.size) |i| {
-        for (0..eigenvecs.size) |j| {
-            fancy_eigenvecs.items[j][i] = eigenvecs.get_val(i, j);
-        }
-    }
-
-    const fancy_ret = fancy_eigenvecs.mul(fancy_eigenvals).mul(fancy_eigenvecs.transpose());
-
-    for (0..eigenvals.size) |i| {
-        for (0..eigenvecs.size) |j| {
-            ret.get(i, j).* = fancy_ret.items[j][i];
-        }
-    }
     return ret;
+}
+
+pub fn transpose(self: Self, gpa: std.mem.Allocator) !Self {
+    var ret = try Self.init(self.num_cols, self.num_rows, gpa);
+
+    for (0..self.num_rows) |i| {
+        for (0..self.num_cols) |j| {
+            ret.get(j, i).* = self.get_val(i, j);
+        }
+    }
+
+    return ret;
+} 
+
+pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Allocator) !Self {
+    // var fancy_eigenvals = zla.Mat(f64, 5, 5).zero;
+    // for (0..eigenvals.num_rows) |i| {
+    //     for (0..eigenvals.num_cols) |j| {
+    //         fancy_eigenvals.items[j][i] = eigenvals.get_val(i, j);
+    //     }
+    // }
+
+    // var fancy_eigenvecs = zla.Mat(f64, 5, 5).zero;
+    // for (0..eigenvecs.size) |i| {
+    //     for (0..eigenvecs.size) |j| {
+    //         fancy_eigenvecs.items[j][i] = eigenvecs.get_val(i, j);
+    //     }
+    // }
+
+    // const fancy_ret = fancy_eigenvecs.mul(fancy_eigenvals).mul(fancy_eigenvecs.transpose());
+
+    const transposed = try eigenvecs.transpose(gpa);
+
+    defer transposed.deinit(gpa);
+
+    const ret1 = try eigenvecs.mul(eigenvals, gpa);
+
+    defer ret1.deinit(gpa);
+
+    const ret2 = try ret1.mul(transposed, gpa);
+
+    
+
+    // for (0..eigenvals.size) |i| {
+    //     for (0..eigenvecs.size) |j| {
+    //         ret.get(i, j).* = fancy_ret.items[j][i];
+    //     }
+    // }
+    return ret2;
 }
