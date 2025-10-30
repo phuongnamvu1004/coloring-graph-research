@@ -23,7 +23,7 @@ pub fn main() !void {
     });
 
     var eigens = try Eigen.init(5, 5, gpa);
-    var eigenvecs = try Eigen.init(5,5, gpa);
+    var eigenvecs = try Eigen.init(5, 5, gpa);
     test_matrix.compute_eigenvalues(&eigens, &eigenvecs);
 
     eigens.debug_print();
