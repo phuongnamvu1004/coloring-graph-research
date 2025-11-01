@@ -13,30 +13,38 @@ pub fn main() !void {
 
     const gpa = allocator.allocator();
 
-    var test_matrix = try Eigen.init(5, 5, gpa);
-    defer test_matrix.deinit(gpa);
+    var graph = try Graph.init(gpa);
+    defer graph.deinit();
 
-    test_matrix.set(&.{
-        1,      0.5,   0.25, 0.125, 0.0625,
-        0.5,    1,     0.5,  0.25,  0.125,
-        0.25,   0.5,   1,    0.5,   0.25,
-        0.125,  0.25,  0.5,  1,     0.5,
-        0.0625, 0.125, 0.25, 0.5,   1,
-    });
+    const v1 = try graph.add_vertex(0);
+    const v2 = try graph.add_vertex(0);
+    const v3 = try graph.add_vertex(0);
+    const v4 = try graph.add_vertex(0);
 
-    var vals = try Eigen.init(5, 5, gpa);
+    try graph.add_edge(v1, v2);
+    try graph.add_edge(v2, v3);
+    try graph.add_edge(v3, v4);
+
+    const k = 3;
+
+    var coloring_graph = try graph.get_coloring_graph(k, gpa);
+    defer coloring_graph.deinit();
+
+    const laplacian = try coloring_graph.laplacian_matrix(gpa);
+    defer laplacian.deinit(gpa);
+
+    var vals = try Eigen.init(laplacian.num_rows, laplacian.num_cols, gpa);
     defer vals.deinit(gpa);
-
-    var vecs = try Eigen.init(5, 5, gpa);
+    var vecs = try Eigen.init(laplacian.num_rows, laplacian.num_cols, gpa);
     defer vecs.deinit(gpa);
 
-    test_matrix.compute_eigenvalues(&vals, &vecs);
+    laplacian.compute_eigenvalues(&vals, &vecs);
 
     const original = try Eigen.original_from_eigens(vals, vecs, gpa);
     defer original.deinit(gpa);
     original.debug_print();
 
-    var compressed = try test_matrix.compressed_matrix(1, gpa);
+    var compressed = try laplacian.compressed_matrix(10, gpa);
     compressed.debug_print();
 }
 

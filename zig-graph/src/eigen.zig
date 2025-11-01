@@ -45,7 +45,7 @@ pub fn debug_print(self: Self) void {
     std.debug.print("------------\n", .{});
     for (0..self.num_rows) |y| {
         for (0..self.num_cols) |x| {
-            std.debug.print("{d:<.5} ", .{self.get_val(x, y)});
+            std.debug.print("{d: >7.4} ", .{self.get_val(x, y)});
         }
         std.debug.print("\n", .{});
     }

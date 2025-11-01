@@ -322,7 +322,7 @@ pub fn debug_print(self: Self) void {
 }
 
 pub fn laplacian_matrix(self: Self, gpa: std.mem.Allocator) !Eigen {
-    var laplacian = try Eigen.init(self.num_vertices(), gpa);
+    var laplacian = try Eigen.init(self.num_vertices(), self.num_vertices(), gpa);
     laplacian.zero();
 
     for (self.adjacency_list.items) |e| {
