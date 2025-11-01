@@ -3,6 +3,8 @@ const zla = @import("zla");
 
 const Self = @This();
 
+const Error = error{InvalidMatrixMultiply};
+
 const num_runs = 10000;
 
 num_rows: usize,
@@ -39,13 +41,15 @@ pub fn get_val(self: Self, x: usize, y: usize) f64 {
     return self.values[y * self.num_cols + x];
 }
 
-pub fn debug_print(self: *Self) void {
-    for (0..self.num_cols) |y| {
-        for (0..self.num_rows) |x| {
-            std.debug.print("{d:<.5} ", .{self.get(x, y).*});
+pub fn debug_print(self: Self) void {
+    std.debug.print("------------\n", .{});
+    for (0..self.num_rows) |y| {
+        for (0..self.num_cols) |x| {
+            std.debug.print("{d:<.5} ", .{self.get_val(x, y)});
         }
         std.debug.print("\n", .{});
     }
+    std.debug.print("------------\n", .{});
 }
 
 pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void { // translated from https://www.cs.nthu.edu.tw/~cchen/ISA5305/Prog/eigen.c which is perhaps the ugliest code I've seen in my entire life
@@ -138,21 +142,19 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
     }
 }
 
-pub fn mul(self: Self, other: Self, gpa: std.mem.Allocator) !Self {
-    const self_num_rows = self.num_rows;
+pub fn mul(self: Self, other: Self, gpa: std.mem.Allocator) !Self { // definitely correct
+    if (self.num_cols != other.num_rows)
+        return Error.InvalidMatrixMultiply;
+    var ret = try Self.init(self.num_rows, other.num_cols, gpa);
 
-    const other_num_cols = other.num_cols;
-
-    var ret = try Self.init(self_num_rows, other_num_cols, gpa);
-
-    for (0..self_num_rows) |i| {
-        for (0..other_num_cols) |j| {
+    for (0..self.num_rows) |i| {
+        for (0..other.num_cols) |j| {
             var dot_prod: f64 = 0;
             for (0..self.num_cols) |col| {
-                dot_prod += self.get_val(i, col) * other.get_val(col, j);
+                dot_prod += self.get_val(col, i) * other.get_val(j, col);
             }
 
-            ret.get(i, j).* = dot_prod;
+            ret.get(j, i).* = dot_prod;
         }
     }
 
@@ -164,7 +166,7 @@ pub fn transpose(self: Self, gpa: std.mem.Allocator) !Self {
 
     for (0..self.num_rows) |i| {
         for (0..self.num_cols) |j| {
-            ret.get(j, i).* = self.get_val(i, j);
+            ret.get(i, j).* = self.get_val(j, i);
         }
     }
 
@@ -175,8 +177,59 @@ pub fn original_from_eigens(eigenvals: Self, eigenvecs: Self, gpa: std.mem.Alloc
     const transposed = try eigenvecs.transpose(gpa);
     defer transposed.deinit(gpa);
 
-    const step1 = try eigenvecs.mul(eigenvals, gpa);
+    const step1 = try transposed.mul(eigenvals, gpa);
     defer step1.deinit(gpa);
 
-    return try step1.mul(transposed, gpa);
+    const result = try step1.mul(eigenvecs, gpa);
+    return result;
+}
+
+pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
+    var eigenvalues_matrix = try Self.init(self.num_rows, self.num_rows, gpa); // self assumed to be square
+    defer eigenvalues_matrix.deinit(gpa);
+
+    var eigenvectors_matrix = try Self.init(self.num_rows, self.num_rows, gpa); // self assumed to be square
+    defer eigenvectors_matrix.deinit(gpa);
+
+    self.compute_eigenvalues(&eigenvalues_matrix, &eigenvectors_matrix);
+
+    for (0..m) |_| { // remove m smallest eigenvalues
+        var min = std.math.inf(f64);
+        var min_index: usize = 0;
+
+        for (0..eigenvalues_matrix.num_rows) |i| {
+            const eigenval = eigenvalues_matrix.get_val(i, i);
+            if (!std.math.isNan(eigenval) and eigenval < min) { // nan to mark as removed
+                min = eigenval;
+                min_index = i;
+            }
+        }
+
+        eigenvalues_matrix.get(min_index, min_index).* = std.math.nan(f64);
+    }
+
+    var new_eigenvalues_matrix = try Self.init(eigenvalues_matrix.num_rows - m, eigenvalues_matrix.num_cols - m, gpa);
+    new_eigenvalues_matrix.zero();
+    defer new_eigenvalues_matrix.deinit(gpa);
+
+    var new_eigenvectors_matrix = try Self.init(eigenvectors_matrix.num_rows - m, eigenvectors_matrix.num_cols, gpa);
+    new_eigenvectors_matrix.zero();
+    defer new_eigenvectors_matrix.deinit(gpa);
+
+    var new_index: usize = 0;
+    for (0..eigenvalues_matrix.num_rows) |i| {
+        const eigenval = eigenvalues_matrix.get_val(i, i);
+        if (!std.math.isNan(eigenval)) {
+            new_eigenvalues_matrix.get(new_index, new_index).* = eigenval;
+
+            for (0..new_eigenvectors_matrix.num_cols) |x| {
+                new_eigenvectors_matrix.get(x, new_index).* = eigenvectors_matrix.get_val(x, i);
+            }
+
+            new_index += 1;
+        }
+    }
+
+    const ret = try original_from_eigens(new_eigenvalues_matrix, new_eigenvectors_matrix, gpa);
+    return ret;
 }
