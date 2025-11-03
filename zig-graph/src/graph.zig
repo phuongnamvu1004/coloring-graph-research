@@ -8,15 +8,27 @@ pub const Vertex = struct {
     id: i32,
     label: i32,
     permutation: i32 = -1,
+    probability: f64 = 1,
 };
 const Edge = struct { // adjacent vertex ids
     a_id: i32,
     b_id: i32,
+    probability: f64 = 1, // for compression stuff, default 1
 };
 const Color = i32;
 
+const VertexHashContext = struct {
+    pub fn hash(_: VertexHashContext, v: Vertex) u64 {
+        return @intCast(v.id); // all ids are unique
+    }
+
+    pub fn eql(_: VertexHashContext, a: Vertex, b: Vertex) bool {
+        return a.id == b.id; // nothing else should matter
+    }
+};
+
 allocator: std.mem.Allocator,
-vertices: std.AutoHashMap(Vertex, void),
+vertices: std.HashMap(Vertex, void, VertexHashContext, std.hash_map.default_max_load_percentage),
 adjacency_list: std.ArrayList(Edge),
 max_vertex_id: i32 = 0,
 num_original_vertices: i32 = 0, // useful metadata for a couple functions
@@ -86,6 +98,10 @@ pub fn add_edge(self: *Self, a: Vertex, b: Vertex) !void {
 
 pub fn add_edge_by_id(self: *Self, a_id: i32, b_id: i32) !void {
     try self.adjacency_list.append(self.allocator, .{ .a_id = a_id, .b_id = b_id });
+}
+
+pub fn add_edge_with_probability(self: *Self, a_id: i32, b_id: i32, probability: f64) !void {
+    try self.adjacency_list.append(self.allocator, .{ .a_id = a_id, .b_id = b_id, .probability = probability });
 }
 
 pub fn adjacent(self: Self, a: Vertex, b: Vertex) bool {
@@ -183,19 +199,33 @@ pub fn print_as_graphml(self: Self, filename: []const u8, k: i32) !void {
         \\<key id="d1" for="node" attr.name="permutation" attr.type="string">
         \\<default>-1</default>
         \\</key>
+        \\<key id="d2" for="node" attr.name="probability" attr.type="float">
+        \\</key>
+        \\<key id="d3" for="edge" attr.name="probability" attr.type="float">
+        \\</key>
         \\<graph id="G" edgedefault="undirected">\n
     );
     var it = self.vertices.keyIterator();
-    var buf: [100:0]u8 = undefined;
-    var itoabuf: [100:0]u8 = undefined;
+    var buf: [256:0]u8 = undefined;
+    var itoabuf: [256:0]u8 = undefined;
     while (it.next()) |v| {
         const coloring_str = itoa(v.label, &itoabuf, k, self.num_original_vertices);
-        const v_string = try std.fmt.bufPrint(&buf, "<node id=\"{d}\"><data key=\"d0\">\"{s}\"</data><data key=\"d1\">\"{d}\"</data></node>\n", .{ v.id, coloring_str, v.permutation });
+        const v_string = try std.fmt.bufPrint(&buf,
+            \\<node id="{d}">
+            \\<data key="d0">"{s}"</data>
+            \\<data key="d1">"{d}"</data>
+            \\<data key="d2">{d}</data></node>
+            \\
+        , .{ v.id, coloring_str, v.permutation, v.probability });
         _ = try file.write(v_string);
     }
 
     for (0.., self.adjacency_list.items) |i, e| {
-        const e_string = try std.fmt.bufPrint(&buf, "<edge id=\"{d}\" source=\"{d}\" target=\"{d}\"/>\n", .{ i, e.a_id, e.b_id });
+        const e_string = try std.fmt.bufPrint(&buf,
+            \\<edge id="{d}" source="{d}" target="{d}">
+            \\<data key="d3">{d}</data></edge>
+            \\
+        , .{ i, e.a_id, e.b_id, e.probability });
         _ = try file.write(e_string);
     }
     _ = try file.write("</graph>\n</graphml>");
@@ -335,6 +365,27 @@ pub fn laplacian_matrix(self: Self, gpa: std.mem.Allocator) !Eigen {
         laplacian.get(@intCast(v.key_ptr.id), @intCast(v.key_ptr.id)).* = @floatFromInt(self.num_neighbors(v.key_ptr.*));
     }
     return laplacian;
+}
+
+pub fn propable_graph_from_laplacian(laplacian: Eigen, gpa: std.mem.Allocator) !Self {
+    var graph = try Self.init(gpa);
+
+    for (0..laplacian.num_cols) |i| {
+        var v = try graph.add_vertex_with_ptr(0);
+        v.probability = laplacian.get_val(i, i);
+    }
+
+    for (0..laplacian.num_cols) |x| {
+        for (x..laplacian.num_rows) |y| {
+            const val = laplacian.get_val(x, y);
+
+            if (val < -0.5) {
+                try graph.add_edge_with_probability(@intCast(x), @intCast(y), val);
+            }
+        }
+    }
+
+    return graph;
 }
 
 fn itoa(value: i64, buf: []u8, base: i32, digits: i32) []u8 { // modified from https://ziggit.dev/t/how-do-i-write-this-itoa-better/7560/4
