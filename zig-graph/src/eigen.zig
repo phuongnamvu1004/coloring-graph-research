@@ -233,3 +233,13 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
     const ret = try original_from_eigens(new_eigenvalues_matrix, new_eigenvectors_matrix, gpa);
     return ret;
 }
+
+pub fn equals_compressed(self: Self, other: Self) bool { // assume both same size square, and assume same labelling (comparing original to compressed)
+    for (0..self.num_rows) |y| {
+        for (y + 1..self.num_cols) |x| {
+            if (!((self.get_val(x, y) < -0.5 and other.get_val(x, y) < -0.5) or (self.get_val(x, y) > -0.5 and other.get_val(x, y) > -0.5)))
+                return false;
+        }
+    }
+    return true;
+}
