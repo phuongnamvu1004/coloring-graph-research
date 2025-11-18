@@ -193,9 +193,6 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
 
     self.compute_eigenvalues(&eigenvalues_matrix, &eigenvectors_matrix);
 
-    eigenvalues_matrix.debug_print();
-    eigenvectors_matrix.debug_print();
-
     for (0..self.num_rows - m) |_| { // retain m largest eigenvalues
         var min = std.math.inf(f64);
         var min_index: usize = 0;
@@ -232,9 +229,6 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
             new_index += 1;
         }
     }
-
-    new_eigenvalues_matrix.debug_print();
-    new_eigenvectors_matrix.debug_print();
 
     const ret = try original_from_eigens(new_eigenvalues_matrix, new_eigenvectors_matrix, gpa);
     return ret;

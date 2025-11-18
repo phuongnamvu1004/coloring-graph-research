@@ -11,11 +11,16 @@ pub fn main() !void {
     var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer allocator.deinit();
 
+    var prng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
+    const rng = prng.random();
+
     const gpa = allocator.allocator();
 
-    var graph = try GraphGen.connected_graph(10, gpa);
+    var graph = try GraphGen.random_graph(10, 10, rng, gpa);
 
     var laplacian = try graph.laplacian_matrix(gpa);
+
+    laplacian.debug_print();
 
     var compressed = try laplacian.compressed_matrix(2, gpa);
 

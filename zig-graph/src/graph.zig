@@ -112,6 +112,14 @@ pub fn adjacent(self: Self, a: Vertex, b: Vertex) bool {
     return false;
 }
 
+pub fn adjacent_id(self: Self, a_id: i32, b_id: i32) bool {
+    for (self.adjacency_list.items) |edge| {
+        if ((edge.a_id == a_id and edge.b_id == b_id) or (edge.a_id == b_id and edge.b_id == b_id))
+            return true;
+    }
+    return false;
+}
+
 pub fn neighbors(self: *Self, vertex: Vertex) NeighborsIterator {
     return NeighborsIterator{
         .g = self,
