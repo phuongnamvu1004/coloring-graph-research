@@ -193,7 +193,10 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
 
     self.compute_eigenvalues(&eigenvalues_matrix, &eigenvectors_matrix);
 
-    for (0..m) |_| { // remove m smallest eigenvalues
+    eigenvalues_matrix.debug_print();
+    eigenvectors_matrix.debug_print();
+
+    for (0..self.num_rows - m) |_| { // retain m largest eigenvalues
         var min = std.math.inf(f64);
         var min_index: usize = 0;
 
@@ -208,11 +211,11 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
         eigenvalues_matrix.get(min_index, min_index).* = std.math.nan(f64);
     }
 
-    var new_eigenvalues_matrix = try Self.init(eigenvalues_matrix.num_rows - m, eigenvalues_matrix.num_cols - m, gpa);
+    var new_eigenvalues_matrix = try Self.init(m, m, gpa);
     new_eigenvalues_matrix.zero();
     defer new_eigenvalues_matrix.deinit(gpa);
 
-    var new_eigenvectors_matrix = try Self.init(eigenvectors_matrix.num_rows - m, eigenvectors_matrix.num_cols, gpa);
+    var new_eigenvectors_matrix = try Self.init(m, eigenvectors_matrix.num_cols, gpa);
     new_eigenvectors_matrix.zero();
     defer new_eigenvectors_matrix.deinit(gpa);
 
@@ -229,6 +232,9 @@ pub fn compressed_matrix(self: Self, m: usize, gpa: std.mem.Allocator) !Self {
             new_index += 1;
         }
     }
+
+    new_eigenvalues_matrix.debug_print();
+    new_eigenvectors_matrix.debug_print();
 
     const ret = try original_from_eigens(new_eigenvalues_matrix, new_eigenvectors_matrix, gpa);
     return ret;

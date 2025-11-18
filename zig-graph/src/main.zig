@@ -13,49 +13,15 @@ pub fn main() !void {
 
     const gpa = allocator.allocator();
 
-    var graph = try Graph.init(gpa);
-    defer graph.deinit();
+    var graph = try GraphGen.connected_graph(10, gpa);
 
-    const v1 = try graph.add_vertex(0);
-    const v2 = try graph.add_vertex(0);
-    const v3 = try graph.add_vertex(0);
-    const v4 = try graph.add_vertex(0);
-    const v5 = try graph.add_vertex(0);
-    const v6 = try graph.add_vertex(0);
+    var laplacian = try graph.laplacian_matrix(gpa);
 
-    try graph.add_edge(v1, v2);
-    try graph.add_edge(v2, v3);
-    try graph.add_edge(v3, v4);
-    try graph.add_edge(v4, v5);
-    try graph.add_edge(v5, v6);
-    try graph.add_edge(v6, v1);
+    var compressed = try laplacian.compressed_matrix(2, gpa);
 
-    const k = 3;
+    compressed.debug_print();
 
-    var coloring_graph = try graph.get_coloring_graph(k, gpa);
-    defer coloring_graph.deinit();
-
-    const laplacian = try coloring_graph.laplacian_matrix(gpa);
-    defer laplacian.deinit(gpa);
-
-    var vals = try Eigen.init(laplacian.num_rows, laplacian.num_cols, gpa);
-    defer vals.deinit(gpa);
-    var vecs = try Eigen.init(laplacian.num_rows, laplacian.num_cols, gpa);
-    defer vecs.deinit(gpa);
-
-    laplacian.compute_eigenvalues(&vals, &vecs);
-
-    const original = try Eigen.original_from_eigens(vals, vecs, gpa);
-    defer original.deinit(gpa);
-    // original.debug_print();
-
-    const compressed = try laplacian.compressed_matrix(40, gpa);
-    // compressed.debug_print();
-
-    var compressed_graph = try Graph.propable_graph_from_laplacian(compressed, gpa);
-
-    try coloring_graph.print_as_graphml("coloring.graphml", k);
-    try compressed_graph.print_as_graphml("compressed.graphml", k);
+    try graph.print_as_graphml("original.graphml", 1);
 }
 
 // As k increases, coloring graph of graph on n vertices "approaches" H(n, k)? a.k.a. take complete graph on k vertices and "expand" it into n dimensions
@@ -66,3 +32,7 @@ pub fn main() !void {
 // compression by <=15 has very consistent values by permutation classes, by >15 they begin to vary but still follow the patterns
 
 // edge compression matches very well with the degree of each vertex, which also appears to match up well with permutation class.
+
+// number is the last for which the original graph remains
+// 3-path graph for k=4 breaks at keeping 12 eigenvalues out of 36
+// 3-path graph for k=3 breaks at keeping 3 eigenvalues out of 12

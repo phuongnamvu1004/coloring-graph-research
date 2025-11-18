@@ -1,7 +1,6 @@
 const std = @import("std");
 const Graph = @import("graph.zig");
 
-
 pub fn graph_from_edge_pairs(
     gpa: std.mem.Allocator,
     num_vertices: i32,
@@ -39,4 +38,18 @@ pub fn graph_from_edge_pairs(
     return g;
 }
 
+pub fn connected_graph(num_vertices: usize, gpa: std.mem.Allocator) !Graph {
+    var graph = try Graph.init(gpa);
 
+    for (0..num_vertices) |_| {
+        _ = try graph.add_vertex(0);
+    }
+
+    for (0..num_vertices) |a| {
+        for (a + 1..num_vertices) |b| {
+            try graph.add_edge_by_id(@intCast(a), @intCast(b));
+        }
+    }
+
+    return graph;
+}
