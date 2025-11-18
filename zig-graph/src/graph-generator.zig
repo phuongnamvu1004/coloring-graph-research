@@ -73,3 +73,31 @@ pub fn random_graph(num_vertices: usize, num_edges: usize, rand: std.Random, gpa
 
     return graph;
 }
+
+pub fn random_connected_graph(num_vertices: usize, num_edges: usize, rng: std.Random, gpa: std.mem.Allocator) !Graph { // assume num_edges > num_vertices
+    var graph = try Graph.init(gpa);
+
+    for (0..num_vertices) |_| {
+        _ = try graph.add_vertex(0);
+    }
+
+    for (0..num_vertices) |a| {
+        var rand: i32 = @intCast(a);
+        while (rand == @as(i32, @intCast(a))) {
+            rand = @intCast(rng.int(usize) % num_vertices);
+        }
+        try graph.add_edge_by_id(@intCast(a), rand);
+    }
+
+    var added: usize = 0;
+    while (added < num_edges - num_vertices) {
+        const rand1: i32 = @intCast(rng.int(usize) % num_vertices);
+        const rand2: i32 = @intCast(rng.int(usize) % num_vertices);
+        if (!graph.adjacent_id(rand1, rand2)) {
+            added += 1;
+            try graph.add_edge_by_id(rand1, rand2);
+        }
+    }
+
+    return graph;
+}
