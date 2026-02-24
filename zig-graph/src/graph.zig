@@ -147,6 +147,10 @@ pub const NeighborsIterator = struct {
     pub fn reset(self: *NeighborsIterator) void {
         self.current_index = 0;
     }
+
+    pub fn skip_to(self: *NeighborsIterator, i: usize) void {
+        self.current_index = i;
+    }
 };
 
 pub fn remove_edge(self: *Self, a: Vertex, b: Vertex) void {
@@ -349,6 +353,80 @@ pub fn bell_from_coloring(self: Self, k: i32, allocator: std.mem.Allocator) !Sel
     }
 
     return bell_graph;
+}
+
+pub fn get_special_vertex(self: Self, k: i32) ?Vertex {
+    var it = self.vertices.iterator();
+
+    while (it.next()) |v| {
+        var coloring = v.key_ptr.label;
+
+        var valid = true;
+
+        while (coloring > 0) {
+            const col = @mod(coloring, k);
+
+            if (col == k - 1) valid = false;
+
+            coloring = @divFloor(coloring, k);
+        }
+
+        if (valid) return v.key_ptr.*;
+    }
+
+    return null;
+}
+
+pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Self {
+    const original = try Self.init(gpa);
+
+    var subgraphs = try std.ArrayList(std.ArrayList(Vertex)).initCapacity(gpa, 1);
+    var subgraph = try std.ArrayList(Vertex).initCapacity(gpa, 1);
+    defer subgraphs.deinit(gpa);
+
+    var start_v: Vertex = .{ .id = -1, .label = 0 };
+
+    var it = self.neighbors(vertex);
+    while (it.next()) |v| { // starting vertex
+
+        if (start_v.id == -1) { // dummy
+            start_v = v;
+
+            subgraph.clearAndFree(gpa);
+            try subgraph.append(gpa, v);
+        } else {
+            if (start_v.id != v.id and self.adjacent(start_v, v)) { // forming complete graph
+                try subgraph.append(gpa, v);
+            } else { // finish complete graph
+                start_v = v;
+
+                const clone = try subgraph.clone(gpa);
+                try subgraphs.append(gpa, clone);
+
+                subgraph.clearAndFree(gpa);
+                try subgraph.append(gpa, v);
+            }
+        }
+    }
+
+    const clone = try subgraph.clone(gpa);
+    try subgraphs.append(gpa, clone);
+
+    subgraph.deinit(gpa);
+
+    for (subgraphs.items) |s| {
+        std.debug.print("{{\n\t", .{});
+        for (s.items) |v| {
+            std.debug.print("{d}, ", .{v.id});
+        }
+        std.debug.print("\n}}\n", .{});
+    }
+
+    for (subgraphs.items) |*s| {
+        s.deinit(gpa);
+    }
+
+    return original;
 }
 
 pub fn debug_print(self: Self) void {

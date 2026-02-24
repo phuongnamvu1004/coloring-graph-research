@@ -5,7 +5,7 @@ const Self = @This();
 
 const Error = error{InvalidMatrixMultiply};
 
-const num_runs = 10000;
+const num_runs = 100000;
 
 num_rows: usize,
 num_cols: usize,
@@ -93,8 +93,9 @@ pub fn compute_eigenvalues(self: Self, eigenvals: *Self, eigenvecs: *Self) void 
         }
 
         sum = @sqrt(2 * sum);
-        if (sum < epsilon)
+        if (sum < epsilon) {
             return;
+        }
 
         alpha = (eigenvals.get(q, q).* - eigenvals.get(p, p).*) / 2 / eigenvals.get(p, q).*;
         if (alpha > epsilon) {
