@@ -378,7 +378,7 @@ pub fn get_special_vertex(self: Self, k: i32) ?Vertex {
 }
 
 pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Self {
-    const original = try Self.init(gpa);
+    var original = try Self.init(gpa);
 
     var subgraphs = try std.ArrayList(std.ArrayList(Vertex)).initCapacity(gpa, 1);
     var subgraph = try std.ArrayList(Vertex).initCapacity(gpa, 1);
@@ -421,6 +421,64 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
         }
         std.debug.print("\n}}\n", .{});
     }
+
+    // For every pair in subgraphs, check for all pair of vertices that make a square. If one of the vertices pair doesn't make a square -> there must be an edge between them
+    // Initializing the vertices
+    const len: usize = subgraphs.items.len;
+
+    for (0..len) |_| {
+        _ = try original.add_vertex(0); // the id is the index of the subgraphs
+    }
+
+    // The big loop
+    for (0..(len - 1)) |i| {
+        for ((i + 1)..len) |j| {
+            const subgraph1 = subgraphs.items[i];
+            const subgraph2 = subgraphs.items[j];
+
+            var all_have_squares = true;
+
+            for (subgraph1.items) |v1| {
+                for (subgraph2.items) |v2| {
+                    var it1 = self.neighbors(v1);
+                    var it2 = self.neighbors(v2);
+
+
+                    var has_square = false;
+                    while (it1.next()) |neighbor_v1| {
+                        it2.reset();
+                        while (it2.next()) |neighbor_v2| {
+                            if (neighbor_v1.id != vertex.id and neighbor_v2.id != vertex.id) {
+                                if (neighbor_v1.id == neighbor_v2.id) {
+                                    has_square = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (has_square) {
+                            break;
+                        }
+                    }
+
+                    if (!has_square) {
+                        all_have_squares = false;
+                        break;
+                    }
+                }
+
+                if (!all_have_squares) {
+                    break;
+                }
+            }
+
+            if (!all_have_squares) {
+                // proceed to add the edges 
+                try original.add_edge_by_id(@intCast(i), @intCast(j));
+            }
+        }
+    }
+
 
     for (subgraphs.items) |*s| {
         s.deinit(gpa);

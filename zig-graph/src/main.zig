@@ -39,6 +39,8 @@ pub fn main() !void {
     var original = try coloring.original_from_coloring(special, gpa);
     defer original.deinit();
 
+    try original.print_as_graphml("reconstructed_original.graphml", k);
+
     // var original_laplacian = try coloring.laplacian_matrix(gpa);
     // defer original_laplacian.deinit(gpa);
     //
