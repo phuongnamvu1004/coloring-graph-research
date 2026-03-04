@@ -414,13 +414,13 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
 
     subgraph.deinit(gpa);
 
-    for (subgraphs.items) |s| {
-        std.debug.print("{{\n\t", .{});
-        for (s.items) |v| {
-            std.debug.print("{d}, ", .{v.id});
-        }
-        std.debug.print("\n}}\n", .{});
-    }
+    // for (subgraphs.items) |s| {
+    //     std.debug.print("{{\n\t", .{});
+    //     for (s.items) |v| {
+    //         std.debug.print("{d}, ", .{v.id});
+    //     }
+    //     std.debug.print("\n}}\n", .{});
+    // }
 
     // For every pair in subgraphs, check for all pair of vertices that make a square. If one of the vertices pair doesn't make a square -> there must be an edge between them
     // Initializing the vertices
@@ -442,7 +442,6 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
                 for (subgraph2.items) |v2| {
                     var it1 = self.neighbors(v1);
                     var it2 = self.neighbors(v2);
-
 
                     var has_square = false;
                     while (it1.next()) |neighbor_v1| {
@@ -473,18 +472,37 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
             }
 
             if (!all_have_squares) {
-                // proceed to add the edges 
+                // proceed to add the edges
                 try original.add_edge_by_id(@intCast(i), @intCast(j));
             }
         }
     }
-
 
     for (subgraphs.items) |*s| {
         s.deinit(gpa);
     }
 
     return original;
+}
+
+pub fn bell_to_all_reconstructions(self: Self, coloring: *Self, k: i32, gpa: std.mem.Allocator) !void {
+    var bell_it = self.vertices.iterator();
+
+    while (bell_it.next()) |bell_v| {
+        var col_it = coloring.vertices.iterator();
+
+        while (col_it.next()) |col_v| {
+            if (bell_v.key_ptr.permutation == col_v.key_ptr.permutation) {
+                var reconstruction = try coloring.original_from_coloring(col_v.key_ptr.*, gpa);
+                defer reconstruction.deinit();
+
+                var filename_buf: [128]u8 = undefined;
+                const filename = try std.fmt.bufPrint(&filename_buf, "reconstruction_perm_{d}.graphml", .{bell_v.key_ptr.permutation});
+                try reconstruction.print_as_graphml(filename, k);
+                break;
+            }
+        }
+    }
 }
 
 pub fn debug_print(self: Self) void {

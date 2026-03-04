@@ -22,16 +22,21 @@ pub fn main() !void {
     const v1 = try graph.add_vertex(0);
     const v2 = try graph.add_vertex(0);
     const v3 = try graph.add_vertex(0);
+    const v4 = try graph.add_vertex(0);
+    const v5 = try graph.add_vertex(0);
 
     try graph.add_edge(v1, v2);
-    try graph.add_edge(v3, v2);
+    try graph.add_edge(v2, v3);
+    try graph.add_edge(v3, v4);
+    try graph.add_edge(v4, v1);
+    try graph.add_edge(v3, v5);
 
-    const k = 4;
+    const k = 3;
+
+    try graph.print_as_graphml("original.graphml", k);
 
     var coloring = try graph.get_coloring_graph(k, gpa);
     defer coloring.deinit();
-
-    try coloring.print_as_graphml("coloring.graphml", k);
 
     const special = coloring.get_special_vertex(k).?;
     std.debug.print("special vertex is id {d}\n", .{special.id});
@@ -40,6 +45,14 @@ pub fn main() !void {
     defer original.deinit();
 
     try original.print_as_graphml("reconstructed_original.graphml", k);
+
+    var bell_graph = try coloring.bell_from_coloring(k, gpa);
+
+    try bell_graph.print_as_graphml("bell.graphml", k);
+
+    try coloring.print_as_graphml("coloring.graphml", k); // after side effect
+
+    try bell_graph.bell_to_all_reconstructions(&coloring, k, gpa);
 
     // var original_laplacian = try coloring.laplacian_matrix(gpa);
     // defer original_laplacian.deinit(gpa);
