@@ -384,33 +384,28 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
     var subgraph = try std.ArrayList(Vertex).initCapacity(gpa, 1);
     defer subgraphs.deinit(gpa);
 
-    var start_v: Vertex = .{ .id = -1, .label = 0 };
+    var seen_vertices = std.AutoHashMap(i32, void).init(gpa);
 
     var it = self.neighbors(vertex);
     while (it.next()) |v| { // starting vertex
+        if (seen_vertices.contains(v.id)) continue;
 
-        if (start_v.id == -1) { // dummy
-            start_v = v;
+        var it2 = self.neighbors(vertex);
 
-            subgraph.clearAndFree(gpa);
-            try subgraph.append(gpa, v);
-        } else {
-            if (start_v.id != v.id and self.adjacent(start_v, v)) { // forming complete graph
-                try subgraph.append(gpa, v);
-            } else { // finish complete graph
-                start_v = v;
+        try subgraph.append(gpa, v);
 
-                const clone = try subgraph.clone(gpa);
-                try subgraphs.append(gpa, clone);
-
-                subgraph.clearAndFree(gpa);
-                try subgraph.append(gpa, v);
+        while (it2.next()) |v2| {
+            if (v.id != v2.id and self.adjacent(v, v2)) { // forms complete graph
+                try seen_vertices.put(v2.id, undefined);
+                try subgraph.append(gpa, v2);
             }
         }
-    }
 
-    const clone = try subgraph.clone(gpa);
-    try subgraphs.append(gpa, clone);
+        const clone = try subgraph.clone(gpa);
+        try subgraphs.append(gpa, clone);
+
+        subgraph.clearAndFree(gpa);
+    }
 
     subgraph.deinit(gpa);
 
@@ -487,6 +482,7 @@ pub fn original_from_coloring(self: *Self, vertex: Vertex, gpa: std.mem.Allocato
 
 pub fn bell_to_all_reconstructions(self: Self, coloring: *Self, k: i32, gpa: std.mem.Allocator) !void {
     var bell_it = self.vertices.iterator();
+    // _ = k;
 
     while (bell_it.next()) |bell_v| {
         var col_it = coloring.vertices.iterator();
@@ -499,6 +495,8 @@ pub fn bell_to_all_reconstructions(self: Self, coloring: *Self, k: i32, gpa: std
                 var filename_buf: [128]u8 = undefined;
                 const filename = try std.fmt.bufPrint(&filename_buf, "reconstruction_perm_{d}.graphml", .{bell_v.key_ptr.permutation});
                 try reconstruction.print_as_graphml(filename, k);
+
+                std.debug.print("(p-class: {d}, vertices = {d}, edges = {d})\n", .{ bell_v.key_ptr.permutation, reconstruction.vertices.count(), reconstruction.adjacency_list.items.len });
                 break;
             }
         }
