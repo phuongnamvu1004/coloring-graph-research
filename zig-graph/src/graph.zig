@@ -497,6 +497,9 @@ pub fn bell_to_all_reconstructions(self: Self, coloring: *Self, k: i32, gpa: std
                 try reconstruction.print_as_graphml(filename, k);
 
                 std.debug.print("(p-class: {d}, vertices = {d}, edges = {d})\n", .{ bell_v.key_ptr.permutation, reconstruction.vertices.count(), reconstruction.adjacency_list.items.len });
+                var bell_vertex = self.get_vertex_by_id(bell_v.key_ptr.id);
+                bell_vertex.?.label = @intCast(reconstruction.adjacency_list.items.len);
+                bell_vertex.?.*.probability = @floatFromInt(reconstruction.adjacency_list.items.len);
                 break;
             }
         }

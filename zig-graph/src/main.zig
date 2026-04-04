@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Graph = @import("graph.zig");
+const Lazy = @import("lazy-coloring-graph.zig");
 const zlm = @import("zlm").as(f64);
 
 const Eigen = @import("eigen.zig");
@@ -24,78 +25,53 @@ pub fn main() !void {
     const v3 = try graph.add_vertex(0);
     const v4 = try graph.add_vertex(0);
     const v5 = try graph.add_vertex(0);
+    const v6 = try graph.add_vertex(0);
+    const v7 = try graph.add_vertex(0);
 
-    try graph.add_edge(v1, v2);
-    try graph.add_edge(v2, v3);
-    try graph.add_edge(v3, v4);
-    try graph.add_edge(v4, v1);
-    try graph.add_edge(v3, v5);
+    _ = try graph.add_edge(v1, v2);
+    _ = try graph.add_edge(v2, v3);
+    _ = try graph.add_edge(v1, v3);
 
-    const k = 3;
+    _ = try graph.add_edge(v1, v4);
+    _ = try graph.add_edge(v4, v5);
+    _ = try graph.add_edge(v2, v6);
+    _ = try graph.add_edge(v5, v7);
+    _ = try graph.add_edge(v6, v7);
+
+    // const v1 = try graph.add_vertex(0);
+    // const v2 = try graph.add_vertex(0);
+    // const v3 = try graph.add_vertex(0);
+    //
+    // _ = try graph.add_edge(v1, v2);
+    // _ = try graph.add_edge(v2, v3);
+
+    const k = 4;
 
     try graph.print_as_graphml("original.graphml", k);
 
-    var coloring = try graph.get_coloring_graph(k, gpa);
-    defer coloring.deinit();
+    var lazy_coloring = try Lazy.init(graph, k, gpa);
 
-    const special = coloring.get_special_vertex(k).?;
-    std.debug.print("special vertex is id {d}\n", .{special.id});
+    const v = try lazy_coloring.get_special_vertex();
+    // var coloring = [_]i32{ 0, 1, 2 };
+    // const v = (try lazy_coloring.get_vertex(&coloring)).?;
+    defer lazy_coloring.deinit_vertex(v);
 
-    var original = try coloring.original_from_coloring(special, gpa);
-    defer original.deinit();
+    for (v.coloring) |c| {
+        std.debug.print("{d}", .{c});
+    }
+    std.debug.print("\n", .{});
 
-    try original.print_as_graphml("reconstructed_original.graphml", k);
+    std.debug.print("{}\n", .{graph.is_coloring_valid(v.coloring)});
 
-    var bell_graph = try coloring.bell_from_coloring(k, gpa);
+    var it = lazy_coloring.neighbors(v);
 
-    try bell_graph.print_as_graphml("bell.graphml", k);
+    while (try it.next()) |vert| {
+        lazy_coloring.print_coloring(vert);
+        lazy_coloring.deinit_vertex(vert);
+    }
 
-    try coloring.print_as_graphml("coloring.graphml", k); // after side effect
-
-    try bell_graph.bell_to_all_reconstructions(&coloring, k, gpa);
-
-    // var original_laplacian = try coloring.laplacian_matrix(gpa);
-    // defer original_laplacian.deinit(gpa);
-    //
-    // const num_vertices: i32 = 72;
-    // const num_edges: i32 = 138;
-    //
-    // var best: i32 = std.math.maxInt(i32);
-    // while (true) {
-    //     var random_graph = try GraphGen.random_connected_graph(num_vertices, num_edges, rng, gpa);
-    //     defer random_graph.deinit();
-    //
-    //     const laplacian = try random_graph.laplacian_matrix(gpa);
-    //     defer laplacian.deinit(gpa);
-    //
-    //     var l: usize = 1;
-    //     var r: usize = @intCast(num_vertices);
-    //     var m: usize = (l + r) / 2;
-    //
-    //     while (true) {
-    //         m = (l + r) / 2;
-    //
-    //         std.debug.print("{d} {d} {d}\n", .{ l, m, r });
-    //         var compressed = try laplacian.compressed_matrix(m, gpa);
-    //         defer compressed.deinit(gpa);
-    //         if (compressed.equals_compressed(laplacian)) {
-    //             if (best > @as(i32, @intCast(m))) {
-    //                 best = @intCast(m);
-    //                 std.debug.print("new best: {}\n", .{m});
-    //                 try random_graph.print_as_graphml("random.graphml", k);
-    //             }
-    //
-    //             r = m;
-    //         } else {
-    //             l = m;
-    //         }
-    //
-    //         if (@abs(r - l) == 1) {
-    //             std.debug.print("new graph\n", .{});
-    //             break;
-    //         }
-    //     }
-    // }
+    var reconstruction = try lazy_coloring.reconstruct(v, gpa);
+    try reconstruction.print_as_graphml("lazy_reconstruction.graphml", k);
 }
 
 // As k increases, coloring graph of graph on n vertices "approaches" H(n, k)? a.k.a. take complete graph on k vertices and "expand" it into n dimensions
