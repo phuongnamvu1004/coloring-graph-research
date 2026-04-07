@@ -8,10 +8,9 @@ original: Graph,
 k: i32,
 allocator: std.mem.Allocator,
 
-const id_type = u256;
+const id_type = u128;
 pub const Vertex = struct {
     coloring: []i32,
-    id: id_type,
 };
 
 pub fn init(original: Graph, k: i32, gpa: std.mem.Allocator) !Self {
@@ -32,10 +31,7 @@ pub fn get_vertex(self: Self, coloring: []i32) !?Vertex {
         for (new_coloring, 0..) |*c, i| {
             c.* = coloring[i];
         }
-        return Vertex{
-            .coloring = new_coloring,
-            .id = self.coloring_hash(new_coloring),
-        };
+        return Vertex{ .coloring = new_coloring };
     }
     return null;
 }
@@ -63,7 +59,7 @@ pub fn get_special_vertex(self: *Self) !Vertex {
         c.* = col;
     }
 
-    return Vertex{ .coloring = coloring, .id = self.coloring_hash(coloring) };
+    return Vertex{ .coloring = coloring };
 }
 
 fn clone_coloring(self: Self, coloring: []i32) ![]i32 {
@@ -79,7 +75,7 @@ fn clone_vertex(self: Self, v: Vertex) !Vertex {
     for (new_coloring, 0..) |*c, i| {
         c.* = v.coloring[i];
     }
-    return Vertex{ .coloring = new_coloring, .id = self.coloring_hash(new_coloring) };
+    return Vertex{ .coloring = new_coloring };
 }
 
 fn equal_coloring(a: []i32, b: []i32) bool {
@@ -88,15 +84,6 @@ fn equal_coloring(a: []i32, b: []i32) bool {
             return false;
     }
     return true;
-}
-
-fn coloring_hash(self: Self, v: []i32) id_type { // WARNING: collisions here limit the number of vertices in the original for coherent reconstructions!!!!
-    var hash: u64 = 0;
-    for (v) |c| {
-        hash *= @intCast(self.k); // the hash is the coloring as a base k number
-        hash += @intCast(c);
-    }
-    return hash;
 }
 
 pub fn print_coloring(self: Self, v: Vertex) void {
@@ -129,7 +116,7 @@ pub const NeighborsIterator = struct {
             new_coloring = try self.next_raw() orelse return null;
         }
 
-        return Vertex{ .coloring = new_coloring, .id = self.g.coloring_hash(new_coloring) };
+        return Vertex{ .coloring = new_coloring };
     }
 
     pub fn increment_index(self: *NeighborsIterator) void {
@@ -171,13 +158,15 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
     var subgraph = try std.ArrayList(Vertex).initCapacity(gpa, 1);
     defer subgraphs.deinit(gpa);
 
-    var seen_vertices = std.AutoHashMap(id_type, void).init(gpa);
+    var seen_vertices: std.ArrayList(Vertex) = try .initCapacity(gpa, 2);
 
     var it = self.neighbors(vertex);
-    while (try it.next()) |v| { // starting vertex
+    cont: while (try it.next()) |v| { // starting vertex
         defer self.deinit_vertex(v);
 
-        if (seen_vertices.contains(v.id)) continue;
+        for (seen_vertices.items) |vert| {
+            if (equal_coloring(v.coloring, vert.coloring)) continue :cont;
+        }
 
         var it2 = self.neighbors(vertex);
 
@@ -186,8 +175,8 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
         while (try it2.next()) |v2| {
             defer self.deinit_vertex(v2);
 
-            if (v.id != v2.id and self.adjacent(v, v2)) { // forms complete graph
-                try seen_vertices.put(v2.id, undefined);
+            if (self.adjacent(v, v2)) { // forms complete graph (adjacency checks distinctness as well)
+                try seen_vertices.append(gpa, try self.clone_vertex(v2));
                 try subgraph.append(gpa, try self.clone_vertex(v2));
             }
         }
@@ -198,15 +187,20 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
         subgraph.clearAndFree(gpa);
     }
 
+    for (seen_vertices.items) |v| {
+        self.deinit_vertex(v);
+    }
+    seen_vertices.deinit(gpa);
+
     subgraph.deinit(gpa);
 
     // for (subgraphs.items) |s| {
-    //     std.debug.print("{{\n\t", .{});
+    //     std.debug.print("{{ \n", .{});
     //     for (s.items) |v| {
-    //         // std.debug.print("{d}, ", .{v.id});
+    //         std.debug.print("\t", .{});
     //         self.print_coloring(v);
     //     }
-    //     std.debug.print("\n}}\n", .{});
+    //     std.debug.print("}} \n", .{});
     // }
 
     // For every pair in subgraphs, check for all pair of vertices that make a square. If one of the vertices pair doesn't make a square -> there must be an edge between them
@@ -223,48 +217,32 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
             const subgraph1 = subgraphs.items[i];
             const subgraph2 = subgraphs.items[j];
 
-            var all_have_squares = true;
+            // edges occur when there are _NOT_ all squares
+            // i.e. there is no edge if there are squares between each vertex in the subgraphs
 
-            for (subgraph1.items) |v1| {
-                for (subgraph2.items) |v2| {
+            // for each pair between subgraphs 1 and 2, iterate through the neighbors of 1 to find a neighbor for 2
+            // if at any point one is not found, break and add edge
+
+            start: for (subgraph1.items) |v1| { // for each node in subgraph 1
+
+                for (subgraph2.items) |v2| { // and node in subgraph 2
                     var it1 = self.neighbors(v1);
-                    var it2 = self.neighbors(v2);
 
-                    var has_square = false;
-                    while (try it1.next()) |neighbor_v1| {
+                    var no_square = true;
+                    while (try it1.next()) |neighbor_v1| { // iterate through neighbors of 1
                         defer self.deinit_vertex(neighbor_v1);
 
-                        it2.reset();
-                        while (try it2.next()) |neighbor_v2| {
-                            defer self.deinit_vertex(neighbor_v2);
-
-                            if (neighbor_v1.id != vertex.id and neighbor_v2.id != vertex.id) {
-                                if (neighbor_v1.id == neighbor_v2.id) {
-                                    has_square = true;
-                                    break;
-                                }
+                        if (!equal_coloring(neighbor_v1.coloring, vertex.coloring)) { // ignore special vertex as square
+                            if (self.adjacent(neighbor_v1, v2)) { // to find a neighbor for 2
+                                no_square = false;
                             }
                         }
-
-                        if (has_square) {
-                            break;
-                        }
                     }
-
-                    if (!has_square) {
-                        all_have_squares = false;
-                        break;
+                    if (no_square) { // if no square is found, break and add edge.
+                        _ = try original.add_edge_by_id(@intCast(i), @intCast(j));
+                        break :start;
                     }
                 }
-
-                if (!all_have_squares) {
-                    break;
-                }
-            }
-
-            if (!all_have_squares) {
-                // proceed to add the edges
-                try original.add_edge_by_id(@intCast(i), @intCast(j));
             }
         }
     }

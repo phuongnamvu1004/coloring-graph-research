@@ -44,32 +44,16 @@ pub fn main() !void {
 
     var prng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
     const rng = prng.random();
-    var graph = try GraphGen.random_connected_graph(20, 40, rng, gpa);
+    var graph = try GraphGen.random_connected_graph(50, 100, rng, gpa);
 
-    const k = try graph.get_minimum_k() + 1; // surplus color
+    const k = try graph.get_minimum_k() + 2; // surplus color
 
     try graph.print_as_graphml("original.graphml", k);
 
     var lazy_coloring = try Lazy.init(graph, k, gpa);
 
     const v = try lazy_coloring.get_special_vertex();
-    // var coloring = [_]i32{ 0, 1, 2 };
-    // const v = (try lazy_coloring.get_vertex(&coloring)).?;
     defer lazy_coloring.deinit_vertex(v);
-
-    for (v.coloring) |c| {
-        std.debug.print("{d}", .{c});
-    }
-    std.debug.print("\n", .{});
-
-    std.debug.print("{}\n", .{graph.is_coloring_valid(v.coloring)});
-
-    var it = lazy_coloring.neighbors(v);
-
-    while (try it.next()) |vert| {
-        lazy_coloring.print_coloring(vert);
-        lazy_coloring.deinit_vertex(vert);
-    }
 
     var reconstruction = try lazy_coloring.reconstruct(v, gpa);
     try reconstruction.print_as_graphml("lazy_reconstruction.graphml", k);
