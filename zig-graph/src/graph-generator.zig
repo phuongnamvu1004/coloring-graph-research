@@ -65,7 +65,7 @@ pub fn random_graph(num_vertices: usize, num_edges: usize, rand: std.Random, gpa
     while (added < num_edges) {
         const rand1: i32 = @intCast(rand.int(usize) % num_vertices);
         const rand2: i32 = @intCast(rand.int(usize) % num_vertices);
-        if (!graph.adjacent_id(rand1, rand2)) {
+        if (!graph.adjacent_id(rand1, rand2) and rand1 != rand2) {
             added += 1;
             try graph.add_edge_by_id(rand1, rand2);
         }
@@ -83,7 +83,7 @@ pub fn random_connected_graph(num_vertices: usize, num_edges: usize, rng: std.Ra
 
     for (0..num_vertices) |a| {
         var rand: i32 = @intCast(a);
-        while (rand == @as(i32, @intCast(a))) {
+        while (rand == @as(i32, @intCast(a)) or graph.adjacent_id(rand, @intCast(a))) {
             rand = @intCast(rng.int(usize) % num_vertices);
         }
         try graph.add_edge_by_id(@intCast(a), rand);
@@ -93,7 +93,7 @@ pub fn random_connected_graph(num_vertices: usize, num_edges: usize, rng: std.Ra
     while (added < num_edges - num_vertices) {
         const rand1: i32 = @intCast(rng.int(usize) % num_vertices);
         const rand2: i32 = @intCast(rng.int(usize) % num_vertices);
-        if (!graph.adjacent_id(rand1, rand2)) {
+        if (!graph.adjacent_id(rand1, rand2) and rand1 != rand2) {
             added += 1;
             try graph.add_edge_by_id(rand1, rand2);
         }

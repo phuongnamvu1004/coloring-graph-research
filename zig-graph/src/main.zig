@@ -12,31 +12,28 @@ pub fn main() !void {
     var allocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer allocator.deinit();
 
-    // var prng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
-    // const rng = prng.random();
-
     const gpa = allocator.allocator();
 
-    var graph = try Graph.init(gpa);
-    defer graph.deinit();
+    // var graph = try Graph.init(gpa);
+    // defer graph.deinit();
 
-    const v1 = try graph.add_vertex(0);
-    const v2 = try graph.add_vertex(0);
-    const v3 = try graph.add_vertex(0);
-    const v4 = try graph.add_vertex(0);
-    const v5 = try graph.add_vertex(0);
-    const v6 = try graph.add_vertex(0);
-    const v7 = try graph.add_vertex(0);
-
-    _ = try graph.add_edge(v1, v2);
-    _ = try graph.add_edge(v2, v3);
-    _ = try graph.add_edge(v1, v3);
-
-    _ = try graph.add_edge(v1, v4);
-    _ = try graph.add_edge(v4, v5);
-    _ = try graph.add_edge(v2, v6);
-    _ = try graph.add_edge(v5, v7);
-    _ = try graph.add_edge(v6, v7);
+    // const v1 = try graph.add_vertex(0);
+    // const v2 = try graph.add_vertex(0);
+    // const v3 = try graph.add_vertex(0);
+    // const v4 = try graph.add_vertex(0);
+    // const v5 = try graph.add_vertex(0);
+    // const v6 = try graph.add_vertex(0);
+    // const v7 = try graph.add_vertex(0);
+    //
+    // _ = try graph.add_edge(v1, v2);
+    // _ = try graph.add_edge(v2, v3);
+    // _ = try graph.add_edge(v1, v3);
+    //
+    // _ = try graph.add_edge(v1, v4);
+    // _ = try graph.add_edge(v4, v5);
+    // _ = try graph.add_edge(v2, v6);
+    // _ = try graph.add_edge(v5, v7);
+    // _ = try graph.add_edge(v6, v7);
 
     // const v1 = try graph.add_vertex(0);
     // const v2 = try graph.add_vertex(0);
@@ -45,7 +42,11 @@ pub fn main() !void {
     // _ = try graph.add_edge(v1, v2);
     // _ = try graph.add_edge(v2, v3);
 
-    const k = 4;
+    var prng = std.Random.DefaultPrng.init(@intCast(std.time.timestamp()));
+    const rng = prng.random();
+    var graph = try GraphGen.random_connected_graph(20, 40, rng, gpa);
+
+    const k = try graph.get_minimum_k() + 1; // surplus color
 
     try graph.print_as_graphml("original.graphml", k);
 

@@ -8,9 +8,10 @@ original: Graph,
 k: i32,
 allocator: std.mem.Allocator,
 
+const id_type = u256;
 pub const Vertex = struct {
     coloring: []i32,
-    id: u64,
+    id: id_type,
 };
 
 pub fn init(original: Graph, k: i32, gpa: std.mem.Allocator) !Self {
@@ -89,7 +90,7 @@ fn equal_coloring(a: []i32, b: []i32) bool {
     return true;
 }
 
-fn coloring_hash(self: Self, v: []i32) u64 { // WARNING: collisions here limit the number of vertices in the original for coherent reconstructions!!!!
+fn coloring_hash(self: Self, v: []i32) id_type { // WARNING: collisions here limit the number of vertices in the original for coherent reconstructions!!!!
     var hash: u64 = 0;
     for (v) |c| {
         hash *= @intCast(self.k); // the hash is the coloring as a base k number
@@ -170,7 +171,7 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
     var subgraph = try std.ArrayList(Vertex).initCapacity(gpa, 1);
     defer subgraphs.deinit(gpa);
 
-    var seen_vertices = std.AutoHashMap(u64, void).init(gpa);
+    var seen_vertices = std.AutoHashMap(id_type, void).init(gpa);
 
     var it = self.neighbors(vertex);
     while (try it.next()) |v| { // starting vertex

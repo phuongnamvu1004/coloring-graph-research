@@ -114,7 +114,7 @@ pub fn adjacent(self: Self, a: Vertex, b: Vertex) bool {
 
 pub fn adjacent_id(self: Self, a_id: i32, b_id: i32) bool {
     for (self.adjacency_list.items) |edge| {
-        if ((edge.a_id == a_id and edge.b_id == b_id) or (edge.a_id == b_id and edge.b_id == b_id))
+        if ((edge.a_id == a_id and edge.b_id == b_id) or (edge.a_id == b_id and edge.b_id == a_id))
             return true;
     }
     return false;
@@ -189,10 +189,39 @@ pub fn num_neighbors(self: Self, vertex: Vertex) i32 {
     return count;
 }
 
+pub fn get_minimum_k(self: *Self) !i32 {
+    const coloring = try self.allocator.alloc(i32, self.num_vertices());
+    defer self.allocator.free(coloring);
+
+    var max_col: i32 = 0;
+
+    for (coloring) |*c| c.* = -1;
+
+    for (coloring, 0..) |*c, i| {
+        var col: i32 = 0;
+
+        const vertex = self.get_vertex_by_id(@intCast(i)).?.*;
+        var it = self.neighbors(vertex);
+        while (it.next()) |v| {
+            if (coloring[@intCast(v.id)] == col) {
+                col += 1;
+                it.reset();
+            }
+        }
+
+        c.* = col;
+        max_col = @max(col, max_col);
+    }
+
+    return max_col + 1;
+}
+
 pub fn is_coloring_valid(self: Self, coloring: []const Color) bool {
     for (self.adjacency_list.items) |e| {
-        if (coloring[@intCast(e.a_id)] == coloring[@intCast(e.b_id)])
+        if (coloring[@intCast(e.a_id)] == coloring[@intCast(e.b_id)]) {
+            // std.debug.print("{d} - {d} are color {d}\n", .{ e.a_id, e.b_id, coloring[@intCast(e.a_id)] });
             return false;
+        }
     }
     return true;
 }
