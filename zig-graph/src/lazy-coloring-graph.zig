@@ -253,3 +253,17 @@ pub fn reconstruct(self: *Self, vertex: Vertex, gpa: std.mem.Allocator) !Graph {
 
     return original;
 }
+
+pub fn get_random_vertex(self: *Self, vertex: Vertex) !Vertex {
+    // can start from a special vertex, greedily look for worst possible vertex
+    return;
+}
+
+pub fn greedy_walk_for_reconstruction(self: *Self, starting_vertex: Vertex, gpa: std.mem.Allocator) !void {
+    return;
+}
+
+pub fn random_walk_for_reconstruction(self: *Self, starting_vertex: Vertex, gpa: std.mem.Allocator) !void {
+    return;
+}
+
